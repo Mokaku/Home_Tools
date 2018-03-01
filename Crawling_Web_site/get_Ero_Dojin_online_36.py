@@ -29,6 +29,10 @@ import boto3
 
 from bs4 import BeautifulSoup
 
+##############################
+## Var Setting Seccrtion
+##############################
+
 s3_bucket_name = "moka-comics"
 
 argvs = sys.argv  # コマンドライン引数を格納したリストの取得
@@ -62,24 +66,20 @@ _s3_bucket_prefix_ = "XXXX-Comics/" + _content_name_ + "/" + _n_date_
 
 source_url = ""
 
+##############################
+## Functions Setting Seccrtion
+##############################
 
-## JSON ファイルを読み込む
-## def open_json_list_file():
-## 
-##     json_f = open(_list_json_file_, 'r' )
-##     json_data = json.load(json_f)
-##     global json_content_id
-##     json_content_id = []
-## 
-##     for x in json_data:
-##         json_content_id.append('{0}'.format(x,json_data[x]))
 
 ## JSON ファイルを読み込む 2
 def open_json_list_file_2():
 
-    json_f = open(_list_json_file_, 'r' )
-    return json.load(json_f)
-    json_f.close()
+    ## if os.path.exists("_list_json_file_"):
+        json_f = open(_list_json_file_, 'r' )
+        return json.load(json_f)
+        json_f.close()
+    ## else:
+    ##     return ""
 
 ## JSON から抽出したdictから必要なIDを抜き出してlistにする
 def open_json_list_file_3(dict_all):
@@ -104,6 +104,7 @@ def get_html(source_url):
     ## print (html)
 
 
+## 対象コンテンツのカテゴリ・非カテゴリページ一覧から一覧で表示されたコンテンツのURLを取得するための関数
 def get_contents_url(html):
 
     ## html = get_html()
@@ -116,7 +117,8 @@ def get_contents_url(html):
 
     ## print (entrys_tag)
     ### URLのみの抽出
-    ### target_url_ary = []
+    ## global target_url_ary
+    target_url_ary = []
     for entry in entrys_tag:
         entry_list = entry.find("a")
         ## return entry_list.attrs['href'] 
@@ -126,62 +128,32 @@ def get_contents_url(html):
         ## print (target_cont)
         target_url_ary.append(target_url)
 
+    return target_url_ary
+
         ### target_url_ary.append(entry_list.attrs['href'])
 
         ### file.write(target_url)
         ### file.write(return_code)
 
 
-## ディレクトリ設定
 
-print(os.getcwd())
+## 各ページから画像をDownloadするためのURL取得するための関数
+def make_download_list(url_list):
 
-## 作業ディレクトリが存在しない場合は作成する
-if not os.path.exists(_tmp_dir_):
-	os.mkdir(_tmp_dir_)
-
-tmp_file_name = _tmp_dir_ + "/" + "test_ero_dojin_online_" + n_datetime + ".list"
-## list_file = open( _tmp_dir_ + "/" + _list_json_file_, 'w')  #追加書き込みモードでオープン
-
-
-### 各ページのURL 収集 実行セクション
-
-
-target_url_ary = [] 
-## def get_all_url():
-
-for i in range(int(argvs[1]),int(argvs[2])):
-    source_url = base_url + "/page/" + str(i)
-    ## print (source_url)
-    html = get_html(source_url)
-    get_contents_url(html)
-
-## file.close() 
-
-
-
-## get_all_url()
-
-## print (target_url_ary[:])
-
-
-print ("""
-#################################################
-""")
-
-def make_download_list():
-
+    global pict_url_ary 
+    pict_url_ary = [] 
+    global cont_discriptions
+    cont_discriptions = []
 
     ## コンテンツの名前やらファイル名の取得
-    tmp_cont_number_01 = target_cont_url.rsplit("/",1)
+    tmp_cont_number_01 = url_list.rsplit("/",1)
     cont_number = tmp_cont_number_01[1].split(".")
     archive_num = cont_number[0]
 	
-    req2 = request_as_fox(target_cont_url)
+    req2 = request_as_fox(url_list)
     target_cont_html = urllib.request.urlopen(req2)
     ## 個別のページをパースする
     soup_2 = BeautifulSoup(target_cont_html, "html.parser") 
-
     ## メイン画像一覧のセクションの取得
     cont_entries_title = soup_2.find("title").text
     cont_entries_tag_1 = soup_2.find("section", attrs={"class": "entry-content"})
@@ -193,13 +165,211 @@ def make_download_list():
     ## cont_entries_id = cont_entries_tag_1.find("span")
     cont_entries_tag_2 = cont_entries_tag_1.find_all("img")
 
-    global cont_discriptions
     cont_discriptions = [ "edol-" + archive_num, cont_entries_title ]
 
     for cet_ary in cont_entries_tag_2:
         ##	print cet_ary.attrs['href']
     	pict_url_ary.append(cet_ary.attrs['src'])
         ##	print url_2
+
+def dl_and_archive_files():
+
+    ## 作業用のディレクトリの作成 
+    tmp_files_dir = archive_name
+    compress_file_name = archive_name + ".zip"
+    s3_upload_name = _s3_bucket_prefix_  + "/" +archive_name + ".zip"
+    ## Download 作業用のディレクトリの作成
+    if not os.path.exists(tmp_files_dir):
+        os.mkdir(tmp_files_dir) 
+        print ("create dl tamp dir")
+
+    ## ZIP書庫の作成
+    print (compress_file_name)
+    compFile = zipfile.ZipFile(compress_file_name, 'w', zipfile.ZIP_STORED)
+
+    ##実ファイルのダウンロード
+
+    for dl_file in pict_url_ary:
+        file_url = dl_file
+        savename_ary = dl_file.rsplit("/",1)
+        savename = tmp_files_dir + "/" +savename_ary[1]
+        readme_file = tmp_files_dir + "/00_README.md"
+		
+        print (file_url,savename,tmp_files_dir)
+
+		## Discription File の作成
+		## if not os.path.exists(readme_file):
+		##	r_file = open(readme_file, 'w')  #追加書き込みモードでオープン
+		##
+		##	r_file.write(cont_discriptions)
+		##	r_file.close() 
+		
+		
+		## urllib.request.urlretrieve(file_url, savename)
+		## urllib.urlretrieve(file_url, savename)
+
+        req = requests.get(file_url)
+        if req.status_code == 200:
+            ## ファイル保存
+            f = open(savename, 'wb')
+            f.write(req.content)
+            f.close()
+		
+
+		
+            ## DLしたファイルを書庫に追加
+            compFile.write(savename)
+
+		
+	
+    ## ZIP 書庫をクローズ
+    compFile.close() 
+
+    ## 作業用のディレクトリの削除
+    if os.path.exists(tmp_files_dir):
+        shutil.rmtree(tmp_files_dir)
+
+    ## S3 へのアップロード
+    upload_file_to_s3(compress_file_name, s3_upload_name)
+
+    ## アップロード後のZIPファイルの削除
+    if os.path.exists(compress_file_name):
+        os.remove(compress_file_name)
+
+
+## S3 へのアップロード
+def upload_file_to_s3(upload_target_name, s3_upload_path):
+    s3 = boto3.resource('s3')
+    s3_bucket = s3.Bucket(s3_bucket_name)
+    s3_bucket.upload_file(upload_target_name, s3_upload_path)
+	
+
+def write_json_tmp_file():
+    _json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
+    info_list.update(_json_dict_2_)
+    ## print (info_list) #dict 形式での表示
+    ## JSON 形式での書き出し
+    print ('{}'.format(json.dumps(info_list,ensure_ascii=False,indent=4)))
+    list_file = open( _list_json_file_, 'w')  #追加書き込みモードでオープン
+    ## ファイルに書き出す
+    json.dump(info_list,list_file,indent=4,ensure_ascii=False)
+    list_file.close() ## デバッグ時暫定のlist_file用ファイルクローズ
+
+
+
+
+############################################
+## Main function
+############################################
+
+def main():
+    ## ディレクトリ設定
+    print(os.getcwd())
+
+    ## 作業ディレクトリが存在しない場合は作成する
+    if not os.path.exists(_tmp_dir_):
+	    os.mkdir(_tmp_dir_)
+
+
+    list_01 = []
+    ### 各ページのURL 収集 実行セクション
+
+    for i in range(int(argvs[1]),int(argvs[2])):
+        source_url = base_url + "/page/" + str(i)
+        html = get_html(source_url)
+        ## return get_contents_url(html)
+        list_01.extend(get_contents_url(html))
+    print (list_01)
+       
+    print (""" ################################################# """)
+
+
+    ## JSON 書き出し用のdict初期化
+    info_list = cl.OrderedDict()
+
+    ## 作業ディレクトリを変更する	
+    os.chdir (_tmp_dir_)
+
+    for target_cont_url in list_01:
+
+        ## 画像のURL一覧表示/コンテンツタイトル表示のための変数の宣言
+
+        make_download_list(target_cont_url)
+	
+        global archive_name
+        archive_name = cont_discriptions[0]
+        print ("## -------- " +  cont_discriptions[0] + " --------- ##")
+        _json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
+        _json_dict_3_ = open_json_list_file_3(_json_dict_2_) # JSONファイルを開いてみるDEBUG 2
+
+   
+        ## JSONファイルのDL済みのURLリストと突き合わせ
+        if cont_discriptions[0] in _json_dict_3_:
+            print ('This ID Already Downloaded')
+            continue
+        else:
+            print ('Download this file')
+
+        print (cont_discriptions[1])
+        info_list[cont_discriptions[0]] = cl.OrderedDict({'url':target_cont_url, 'Discription':cont_discriptions[1]})
+
+        ## 画像のURL一覧表示
+        ## print (pict_url_ary[:]) # for DEBUG
+
+
+#############################################
+
+        dl_and_archive_files()
+
+    ## JSON>>dictと今回DLしたファイルのdictを合体させる
+    info_list.update(_json_dict_2_)
+    ## print (info_list) #dict 形式での表示
+    ## JSON 形式での書き出し
+    print ('{}'.format(json.dumps(info_list,ensure_ascii=False,indent=4)))
+    list_file = open( _list_json_file_, 'w')  #追加書き込みモードでオープン
+    ## ファイルに書き出す
+    json.dump(info_list,list_file,indent=4,ensure_ascii=False)
+    list_file.close() ## デバッグ時暫定のlist_file用ファイルクローズ
+
+
+main()
+
+
+
+
+'''
+############################################
+## Main execute Section
+############################################
+
+## ディレクトリ設定
+print(os.getcwd())
+
+## 作業ディレクトリが存在しない場合は作成する
+if not os.path.exists(_tmp_dir_):
+	os.mkdir(_tmp_dir_)
+
+## tmp_file_name = _tmp_dir_ + "/" + "test_ero_dojin_online_" + n_datetime + ".list"
+## list_file = open( _tmp_dir_ + "/" + _list_json_file_, 'w')  #追加書き込みモードでオープン
+
+
+### 各ページのURL 収集 実行セクション
+target_url_ary = [] 
+## def get_all_url():
+
+for i in range(int(argvs[1]),int(argvs[2])):
+    source_url = base_url + "/page/" + str(i)
+    ## print (source_url)
+    html = get_html(source_url)
+    get_contents_url(html)
+
+## file.close() 
+## get_all_url()
+## print (target_url_ary[:])
+
+
+print (""" ################################################# """)
+
 
 ## JSON 書き出し用のdict初期化
 info_list = cl.OrderedDict()
@@ -246,7 +416,6 @@ for target_cont_url in target_url_ary:
 
     ## 画像のURL一覧表示
     ## print (pict_url_ary[:]) # for DEBUG
-
 
 
 
@@ -321,9 +490,7 @@ for target_cont_url in target_url_ary:
 
 		
 
-    print (""" ## ------------------------------------------- ##
-	
-    """)
+    print (" ## ------------------------------------------- ## ")
 
 
 _json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
@@ -339,7 +506,7 @@ json.dump(info_list,list_file,indent=4,ensure_ascii=False)
 list_file.close() ## デバッグ時暫定のlist_file用ファイルクローズ
 
 
-'''
+
 ##########################################################################################
 '''
 
