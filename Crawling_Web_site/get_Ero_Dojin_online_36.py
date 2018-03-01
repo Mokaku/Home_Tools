@@ -24,6 +24,7 @@ import shutil
 
 
 import json
+import collections as cl
 import boto3
 
 from bs4 import BeautifulSoup
@@ -43,8 +44,15 @@ if (argc != 3):   # 引数が足りない場合は、その旨を表示
 
 # アクセスするURL
 base_url = "http://eromangadoujinonline.com/category/%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%8a%e3%83%ab"
+## 作業ディレクトリの設定
+_tmp_dir_ = "tmp_list"
+_list_json_file_ = "sample_ero_dojin_online_list.json"
+_list_json_file_2_ = "sample_ero_dojin_online_list_NEW.json"
+
 
 return_code = "\n"
+
+## 現在の日付・時間の取得設定
 n_datetime = datetime.now().strftime('%Y%m%d_%H%M%S')
 _n_date_ = datetime.now().strftime('%Y%m%d')
 
@@ -53,6 +61,36 @@ _content_name_ = "Ero_Doujin_Online"
 _s3_bucket_prefix_ = "XXXX-Comics/" + _content_name_ + "/" + _n_date_ 
 
 source_url = ""
+
+
+## JSON ファイルを読み込む
+## def open_json_list_file():
+## 
+##     json_f = open(_list_json_file_, 'r' )
+##     json_data = json.load(json_f)
+##     global json_content_id
+##     json_content_id = []
+## 
+##     for x in json_data:
+##         json_content_id.append('{0}'.format(x,json_data[x]))
+
+## JSON ファイルを読み込む 2
+def open_json_list_file_2():
+
+    json_f = open(_list_json_file_, 'r' )
+    return json.load(json_f)
+    json_f.close()
+
+## JSON から抽出したdictから必要なIDを抜き出してlistにする
+def open_json_list_file_3(dict_all):
+    
+    ## return dict_all
+
+    global json_content_id_2
+    json_content_id_2 = []
+    for x in dict_all:
+        json_content_id_2.append('{0}'.format(x,dict_all[x]))
+    return json_content_id_2
 
 
 def request_as_fox(url):
@@ -85,7 +123,7 @@ def get_contents_url(html):
         target_cont = entry_list.attrs['href'],entry_list.attrs['title']
         target_url = entry_list.attrs['href']
         ## print (entry_list)
-        print (target_cont)
+        ## print (target_cont)
         target_url_ary.append(target_url)
 
         ### target_url_ary.append(entry_list.attrs['href'])
@@ -98,12 +136,12 @@ def get_contents_url(html):
 
 print(os.getcwd())
 
-tmp_dir = "tmp_list"
-if not os.path.exists(tmp_dir):
-	os.mkdir(tmp_dir)
+## 作業ディレクトリが存在しない場合は作成する
+if not os.path.exists(_tmp_dir_):
+	os.mkdir(_tmp_dir_)
 
-tmp_file_name = tmp_dir + "/" + "test_ero_dojin_online_" + n_datetime + ".list"
-## file = open(tmp_file_name, 'a')  #追加書き込みモードでオープン
+tmp_file_name = _tmp_dir_ + "/" + "test_ero_dojin_online_" + n_datetime + ".list"
+## list_file = open( _tmp_dir_ + "/" + _list_json_file_, 'w')  #追加書き込みモードでオープン
 
 
 ### 各ページのURL 収集 実行セクション
@@ -124,7 +162,7 @@ for i in range(int(argvs[1]),int(argvs[2])):
 
 ## get_all_url()
 
-print (target_url_ary[:])
+## print (target_url_ary[:])
 
 
 print ("""
@@ -155,7 +193,6 @@ def make_download_list():
     ## cont_entries_id = cont_entries_tag_1.find("span")
     cont_entries_tag_2 = cont_entries_tag_1.find_all("img")
 
-    print ("## -------------------- ##")
     global cont_discriptions
     cont_discriptions = [ "edol-" + archive_num, cont_entries_title ]
 
@@ -164,8 +201,11 @@ def make_download_list():
     	pict_url_ary.append(cet_ary.attrs['src'])
         ##	print url_2
 
+## JSON 書き出し用のdict初期化
+info_list = cl.OrderedDict()
+
 ## 作業ディレクトリを変更する	
-os.chdir (tmp_dir)
+os.chdir (_tmp_dir_)
 
 for target_cont_url in target_url_ary:
 
@@ -184,15 +224,34 @@ for target_cont_url in target_url_ary:
 	
     ## print (cont_entries_id)
     archive_name = cont_discriptions[0]
-    print (cont_discriptions[0])
+    print ("## -------- " +  cont_discriptions[0] + " --------- ##")
+    ## open_json_list_file() # 保存したJSONファイルを開いてみるDEBUG
+    _json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
+    _json_dict_3_ = open_json_list_file_3(_json_dict_2_) # JSONファイルを開いてみるDEBUG 2
+
+    ## print (_json_dict_3_)
+   
+    ##### 一時的にこのブロックコメントアウト
+    if cont_discriptions[0] in _json_dict_3_:
+        print ('This ID Already Downloaded')
+        continue
+    else:
+        print ('Download this file')
+
+    ## print (cont_discriptions[0])
     print (cont_discriptions[1])
-    print ("## -------------------- ##")
+    info_list[cont_discriptions[0]] = cl.OrderedDict({'url':target_cont_url, 'Discription':cont_discriptions[1]})
+    ##list_file.write(info_list[:])
+    ## print ("## -------------------- ##")
 
     ## 画像のURL一覧表示
-    print (pict_url_ary[:]) # for DEBUG
+    ## print (pict_url_ary[:]) # for DEBUG
 
 
 
+
+
+##########################################################################################
 
     ## 作業用のディレクトリの作成 
     tmp_files_dir = archive_name
@@ -267,5 +326,20 @@ for target_cont_url in target_url_ary:
     """)
 
 
+_json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
+## print (info_list) #dict 形式での表示
+## print ("## -------------------- ##")
+info_list.update(_json_dict_2_)
+## print (info_list) #dict 形式での表示
+## JSON 形式での書き出し
+print ('{}'.format(json.dumps(info_list,ensure_ascii=False,indent=4)))
+list_file = open( _list_json_file_, 'w')  #追加書き込みモードでオープン
+## ファイルに書き出す
+json.dump(info_list,list_file,indent=4,ensure_ascii=False)
+list_file.close() ## デバッグ時暫定のlist_file用ファイルクローズ
 
+
+'''
+##########################################################################################
+'''
 
