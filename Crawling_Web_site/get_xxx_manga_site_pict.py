@@ -10,6 +10,8 @@ import os # Directory作成などのため
 import sys # モジュール属性 argv を取得するため
 from datetime import datetime # 時間取得
 
+sys.path.append('./libraries')
+
 
 import urllib
 ## import urllib2
@@ -372,7 +374,7 @@ def main():
         new_json.write('{}')
         new_json.close()
 
-
+    num_of_list = 1
     for target_cont_url in list_01:
 
         ## 画像のURL一覧表示/コンテンツタイトル表示のための変数の宣言
@@ -381,7 +383,7 @@ def main():
 	
         global archive_name
         archive_name = cont_discriptions[0]
-        print ("## -------- " +  cont_discriptions[0] + " --------- ##")
+        print ("## -------- " +  cont_discriptions[0] + " (" + str(num_of_list) + "/" + str(len(list_01)) + ") " + " --------- ##")
         _json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
         _json_dict_3_ = open_json_list_file_3(_json_dict_2_) # JSONファイルを開いてみるDEBUG 2
 
@@ -389,6 +391,7 @@ def main():
         ## JSONファイルのDL済みのURLリストと突き合わせ
         if cont_discriptions[0] in _json_dict_3_:
             print ('This ID Already Downloaded')
+            num_of_list += 1
             continue
         else:
             print ('Download this file')
@@ -403,6 +406,8 @@ def main():
 #############################################
 
         dl_and_archive_files()
+
+        num_of_list += 1
 
     
     ## ダウンロードしたコンテンツをJSON形式で表示する
