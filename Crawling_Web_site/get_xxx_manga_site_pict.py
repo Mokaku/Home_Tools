@@ -69,7 +69,7 @@ elif argvs[3] == '003':
     base_url = "http://xn--gmq92kd2rm1kx34a.com/category/line-a/%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%8a%e3%83%ab"
     ## 作業ディレクトリの設定
     _list_json_file_ = "zetsubou_manga_kan_list.json"
-    _content_name_ = "Zetsubou_Manga_kan"
+    _content_name_ = "Zetsubou_Manga_Kan"
     f_prefix = ""
 else:
     print ('Contents_Code: [001] = Ero_Dojin_Online, [002] = Ero_Managa_Log, [003] = Zetsubou_Manga_kan')
