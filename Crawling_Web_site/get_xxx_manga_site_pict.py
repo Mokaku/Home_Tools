@@ -52,14 +52,17 @@ c_code = argvs[3]
 
 if argvs[3] == '001':
     # アクセスするURL
-    base_url = "http://eromangadoujinonline.com/category/%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%8a%e3%83%ab"
+    ### base_url = "http://eromangadoujinonline.com/category/%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%8a%e3%83%ab" ## 古いカテゴリ
+    base_url = "http://eromangadoujinonline.com/category/original"
     ## 作業ディレクトリの設定
     _list_json_file_ = "ero_dojin_online_list.json"
     _content_name_ = "Ero_Doujin_Online"
     f_prefix = "edol-"
 elif argvs[3] == '002':
     # アクセスするURL
-    base_url = "http://erodoujinlog.com/category/%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%8a%e3%83%ab"
+    ## base_url = "http://erodoujinlog.com/category/%e3%82%aa%e3%83%aa%e3%82%b8%e3%83%8a%e3%83%ab"
+        ## "カテゴリ - オリジナル"が正常に動作していないのでトップページから抽出
+    base_url = "http://erodoujinlog.com/"
     ## 作業ディレクトリの設定
     _list_json_file_ = "ero_dojin_log_list.json"
     _content_name_ = "Ero_Doujin_Log"
@@ -167,8 +170,13 @@ def get_contents_url(html):
             target_url = entry_list.attrs['href'] 
         elif c_code == '002':
             entry_list = entry.find("a")
+            if "オリジナル" not in str(entry_list):
+                continue
             target_cont = entry_list.attrs['href'],entry_list.attrs['title']
             target_url = entry_list.attrs['href']
+            ### print ( "entry_list : " + str(entry_list) )
+            ### print ( "target_cont : " + str(target_cont) )
+            ### print ( " target_url : " + str(target_url) )
         elif c_code == '003':
             entry_list = entry.find("h2").a
             target_cont = entry_list.attrs['href'],entry_list.text 
@@ -219,9 +227,12 @@ def make_download_list(url_list):
     elif c_code == '003':
         cont_entries_title = soup_2.find("title").text
         cont_entries_tag_1 = soup_2.find("div", attrs={"class": "post-content"}) 
-        cont_entries_id = cont_entries_tag_1.find("span").get("id")
+        ## cont_entries_id = cont_entries_tag_1.find("span").get("id")
+        cont_entries_id = soup_2.find("link", attrs={"rel": "shortlink"}).get("href").split("?p=")
+        ## cont_entries_id_3 = cont_entries_id_2.get("href")
         cont_entries_tag_2 = cont_entries_tag_1.find_all("img") 
-        cont_discriptions = [ cont_entries_id, cont_entries_title ]
+        ## cont_discriptions = [ cont_entries_id, cont_entries_id_2[1], cont_entries_title ]
+        cont_discriptions = [ "more-" + cont_entries_id[1], cont_entries_title ]
 
     for cet_ary in cont_entries_tag_2:
         if c_code in ['001', '003']: 
@@ -233,6 +244,8 @@ def make_download_list(url_list):
 def dl_and_archive_files():
 
     ## 作業用のディレクトリの作成 
+    print ( "Cont Discriptions : " + str(cont_discriptions[:]))
+    print ( "Archive_Name : " + archive_name)
     tmp_files_dir = archive_name
     compress_file_name = archive_name + ".zip"
     s3_upload_name = _s3_bucket_prefix_  + "/" + _n_date_ + "/" + archive_name + ".zip"
@@ -242,7 +255,7 @@ def dl_and_archive_files():
         ## print ("create dl tamp dir")
 
     ## ZIP書庫の作成
-    print (compress_file_name)
+    print ("Compress Name : " + compress_file_name)
     compFile = zipfile.ZipFile(compress_file_name, 'w', zipfile.ZIP_STORED)
 
     ##実ファイルのダウンロード
@@ -277,11 +290,13 @@ def dl_and_archive_files():
         shutil.rmtree(tmp_files_dir)
 
     ## S3 へのアップロード
+    print ("UPLOAD to s3 as :" + compress_file_name )
     upload_file_to_s3(compress_file_name, s3_upload_name)
 
     ## アップロード後のZIPファイルの削除
     if os.path.exists(compress_file_name):
         os.remove(compress_file_name)
+        print ("Finish delete zip file")
 
 
 ## S3 へのアップロード
@@ -429,7 +444,42 @@ def main():
     upload_file_to_s3(_list_json_file_, _s3_bucket_prefix_ + "/" + _list_json_file_ )
 
 
+def debug_main():
+    list_01 = []
+    ### 各ページのURL 収集 実行セクション
+
+    for i in range(int(argvs[1]),int(argvs[2])):
+        source_url = base_url + "/page/" + str(i)
+        html = get_html(source_url)
+        ## return get_contents_url(html)
+        list_01.extend(get_contents_url(html))
+    ## print (list_01)
+       
+    print (""" ################################################# """)
+
+    num_of_list = 1
+    for target_cont_url in list_01:
+
+        ## 画像のURL一覧表示/コンテンツタイトル表示のための変数の宣言
+
+        make_download_list(target_cont_url)
+	
+        global archive_name
+        archive_name = cont_discriptions[0]
+        print ( "Cont Discriptions : " + str(cont_discriptions[:]))
+        print ( "Archive_Name : " + archive_name)
+        print ("## -------- " +  cont_discriptions[0] + " (" + str(num_of_list) + "/" + str(len(list_01)) + ") " + " --------- ##")
+        ## _json_dict_2_ = open_json_list_file_2() # JSONファイルを開いてみるDEBUG 2
+        ## _json_dict_3_ = open_json_list_file_3(_json_dict_2_) # JSONファイルを開いてみるDEBUG 2
+
+        num_of_list += 1
+    
+
 main()
+### debug_main()
+
+
+
 
 
 
