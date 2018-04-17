@@ -42,7 +42,7 @@ argc = len(argvs) # 引数の個数
 
 if (argc != 4):   # 引数が足りない場合は、その旨を表示
     print ('Usage: # python %s [Start_page_num] [End_page_num] [Contents_code]' % argvs[0] ) 
-    print ('Contents_Code: [001] = Ero_Dojin_Online, [002] = Ero_Managa_Log, [003] = Zetsubou_Manga_kan')
+    print ('Contents_Code: [001] = Ero_Dojin_Online, [002] = Ero_Managa_Log, [003] = Zetsubou_Manga_kan, [004] = Ero_Manga_Project' )
     quit()         # プログラムの終了
 
 
@@ -73,9 +73,16 @@ elif argvs[3] == '003':
     ## 作業ディレクトリの設定
     _list_json_file_ = "zetsubou_manga_kan_list.json"
     _content_name_ = "Zetsubou_Manga_Kan"
-    f_prefix = ""
+    f_prefix = "more-"
+elif argvs[3] == '004':
+    # アクセスするURL
+    base_url = "http://eroproject.com/"
+    ## 作業ディレクトリの設定
+    _list_json_file_ = "ero_manga_projenct_list.json"
+    _content_name_ = "Ero_Manga_Project"
+    f_prefix = "eropj-"
 else:
-    print ('Contents_Code: [001] = Ero_Dojin_Online, [002] = Ero_Managa_Log, [003] = Zetsubou_Manga_kan')
+    print ('Contents_Code: [001] = Ero_Dojin_Online, [002] = Ero_Managa_Log, [003] = Zetsubou_Manga_kan, [004] = Ero_Manga_Project' )
     sys.exit(argvs[3] + ' is not registered Contents code')
 
 print ( base_url,
@@ -159,6 +166,8 @@ def get_contents_url(html):
         entries_tag = soup.find_all("h2", attrs={"class": "article-title entry-title"})
     elif c_code == '003':
         entries_tag = soup.find_all("div", attrs={"class": "post-header"})
+    elif c_code == '004':
+        entries_tag = soup.find_all("div", attrs={"class": "article-body-inner"})
 
     ### URLのみの抽出
     target_url_ary = []
@@ -174,13 +183,21 @@ def get_contents_url(html):
                 continue
             target_cont = entry_list.attrs['href'],entry_list.attrs['title']
             target_url = entry_list.attrs['href']
-            ### print ( "entry_list : " + str(entry_list) )
-            ### print ( "target_cont : " + str(target_cont) )
-            ### print ( " target_url : " + str(target_url) )
+            ## print ( "entry_list : " + str(entry_list) )
+            ## print ( "target_cont : " + str(target_cont) )
+            ## print ( "target_url : " + str(target_url) )
         elif c_code == '003':
             entry_list = entry.find("h2").a
             target_cont = entry_list.attrs['href'],entry_list.text 
             target_url = entry_list.attrs['href']
+        elif c_code == '004':
+            ## print (entry)
+            entry_list = entry.find("a")
+            target_cont = entry_list.attrs['title'],entry_list.text 
+            target_url = entry_list.attrs['href']
+            ## print ( "entry_list : " + str(entry_list) )
+            ## print ( "target_cont : " + str(target_cont) )
+            ## print ( "target_url : " + str(target_url) )
 
         target_url_ary.append(target_url) 
 
@@ -232,10 +249,17 @@ def make_download_list(url_list):
         ## cont_entries_id_3 = cont_entries_id_2.get("href")
         cont_entries_tag_2 = cont_entries_tag_1.find_all("img") 
         ## cont_discriptions = [ cont_entries_id, cont_entries_id_2[1], cont_entries_title ]
-        cont_discriptions = [ "more-" + cont_entries_id[1], cont_entries_title ]
+        cont_discriptions = [ f_prefix + cont_entries_id[1], cont_entries_title ]
+    elif c_code == '004':  
+        cont_entries_title = soup_2.find("title").text
+        cont_entries_tag_1 = soup_2.find("section", attrs={"class": "entry-content"}) 
+        cont_entries_tag_2 = cont_entries_tag_1.find_all("img") 
+        archive_num_base = archive_num.split("?p=")
+        archive_num = archive_num_base[1]
+        cont_discriptions = [ f_prefix + archive_num, cont_entries_title ]
 
     for cet_ary in cont_entries_tag_2:
-        if c_code in ['001', '003']: 
+        if c_code in ['001', '003', '004']: 
             pict_url_ary.append(cet_ary.attrs['src']) 
         elif c_code in ['002']: 
             pict_url_ary.append(cet_ary.attrs['href']) 
@@ -244,7 +268,7 @@ def make_download_list(url_list):
 def dl_and_archive_files():
 
     ## 作業用のディレクトリの作成 
-    print ( "Cont Discriptions : " + str(cont_discriptions[:]))
+    ## print ( "Cont Discriptions : " + str(cont_discriptions[:]))
     print ( "Archive_Name : " + archive_name)
     tmp_files_dir = archive_name
     compress_file_name = archive_name + ".zip"
@@ -361,7 +385,11 @@ def main():
     ### 各ページのURL 収集 実行セクション
 
     for i in range(int(argvs[1]),int(argvs[2])):
-        source_url = base_url + "/page/" + str(i)
+        if c_code in ['001', '002', '003']: 
+            source_url = base_url + "/page/" + str(i)
+        else:
+            ## source_url = base_url + "%3fp%3d1" + str(i)
+            source_url = base_url + "?cat=3389&paged=" + str(i)
         html = get_html(source_url)
         ## return get_contents_url(html)
         list_01.extend(get_contents_url(html))
@@ -463,6 +491,9 @@ def debug_main():
         ## 画像のURL一覧表示/コンテンツタイトル表示のための変数の宣言
 
         make_download_list(target_cont_url)
+
+        ## 画像のURL一覧表示
+        print (pict_url_ary[:]) # for DEBUG
 	
         global archive_name
         archive_name = cont_discriptions[0]
@@ -476,7 +507,7 @@ def debug_main():
     
 
 main()
-### debug_main()
+## debug_main()
 
 
 
