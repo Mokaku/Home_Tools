@@ -239,7 +239,8 @@ def make_download_list(url_list):
     elif c_code == '002':  
         cont_entries_tag_1 = soup_2.find("section", attrs={"class": "entry-content"}) 
         cont_entries_title = cont_entries_tag_1.find("h3")
-        cont_entries_tag_2 = cont_entries_tag_1.find_all("a")
+        ## cont_entries_tag_2 = cont_entries_tag_1.find_all("a")
+        cont_entries_tag_2 = cont_entries_tag_1.find_all("img")
         cont_discriptions = [ archive_num, cont_entries_title.text ]
     elif c_code == '003':
         cont_entries_title = soup_2.find("title").text
@@ -259,10 +260,10 @@ def make_download_list(url_list):
         cont_discriptions = [ f_prefix + archive_num, cont_entries_title ]
 
     for cet_ary in cont_entries_tag_2:
-        if c_code in ['001', '003', '004']: 
+        if c_code in ['001', '002', '003', '004']: 
             pict_url_ary.append(cet_ary.attrs['src']) 
-        elif c_code in ['002']: 
-            pict_url_ary.append(cet_ary.attrs['href']) 
+        ## elif c_code in ['002']: 
+            ## pict_url_ary.append(cet_ary.attrs['href']) 
 
 
 def dl_and_archive_files():
