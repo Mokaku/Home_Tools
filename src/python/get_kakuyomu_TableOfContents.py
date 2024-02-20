@@ -21,6 +21,8 @@ load_url = kakuyomu_url + "/works/" + novel_id
 html = requests.get(load_url)
 soup = BeautifulSoup(html.content, "html.parser")
 
+filename = '../../html/' + novel_id + '.html'
+
 ###################################################
 ## bt4 module 使い方メモ
 ###################################################
@@ -47,6 +49,8 @@ work_title: str = ""
 ## 出力用　HTML HEADER
 
 html_head = """
+<!DOCTYPE html>
+<html lang=ja>
 <html><head><title>id: {title_id}</title></head>
 <body>
 <h1>目次</h1>
@@ -62,25 +66,25 @@ html_footer = """
 ###################################################
 
 
-def get_work_info():
+def get_work_info(f):
 	for key in rec01:
 		if ("Work:" in key):
 			# print(key)
 			if (work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
 				work_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
 				# work_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-				print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" )
+				print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" , file=f)
 
-def get_episode_info():
+def get_episode_info(f):
 	for key in rec01:
 		if ("Episode" in key):
 			# print(key)
 			episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
 			episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
 
-			print ("<ul>")
-			print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a><br></li>" )
-			print ("</ul>")
+			print ("<ul>", file=f)
+			print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a><br></li>" , file=f)
+			print ("</ul>", file=f)
 
 def get_chapter_info():
 	for chap_list_key in rec01:
@@ -97,7 +101,7 @@ def get_chapter_info():
 			# 	chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
 			# 	print (chapter_id, chapter_title)
 
-def get_chapter_title():
+def get_chapter_title(f):
 	for key in rec01:
 		if ("Chapter" in key):
 			# print(key)
@@ -108,40 +112,48 @@ def get_chapter_title():
 				cont_chapter_list =(j["props"]["pageProps"]["__APOLLO_STATE__"]["TableOfContentsChapter:" + chapter_id]["episodeUnions"])
 
 				# print (key,chapter_id, chapter_title)
-				print ("<h3>" + chapter_title + "</h3>")
-				print ("<ul>")
+				print ("<h3>" + chapter_title + "</h3>", file=f)
+				print ("<ul>", file=f)
 				for list_key in cont_chapter_list:
 					# print (list_key)
 					ep_key=list_key["__ref"]
 					# print (ep_key)
-					get_title_element(ep_key)
-				print ("</ul>")
+					get_title_element(ep_key, f)
+				print ("</ul>", file=f)
 
 
 			# 	print (chapter_id, chapter_title)
 
-def get_title_element(ep_key):
+def get_title_element(ep_key ,f):
 	episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["title"])
 	episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["id"])
-	print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a><br></li>" )
+	print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a><br></li>" , file=f)
 
 def main():
-	print (html_head)
-	get_work_info()
-	# print ( work_title + " (id:" + work_id + ")" )
+
+	with open(filename, 'w') as f:
+
+		print (html_head, file=f)
+		get_work_info(f)
+		# print ( work_title + " (id:" + work_id + ")" )
 
 
-	## test チャプター有り無し判定により出力内容を変更する
-	if(len(j["props"]["pageProps"]["__APOLLO_STATE__"]["Work:" + work_id]["tableOfContents"])> 1):
-		# print("チャープターあり")
-		get_chapter_title()
-	else:
-		# print("チャープターなし")
-		get_episode_info()
+		## test チャプター有り無し判定により出力内容を変更する
+		if(len(j["props"]["pageProps"]["__APOLLO_STATE__"]["Work:" + work_id]["tableOfContents"])> 1):
+			# print("チャープターあり")
+			get_chapter_title(f)
+		else:
+			# print("チャープターなし")
+			get_episode_info(f)
 
-	# get_chapter_info()
-	# get_episode_info()
-	print (html_footer)
+		# get_chapter_info()
+		print (html_footer, file=f)
+
+		f.close()
+
+		with open(filename) as f:
+			contents = f.read()
+			print(contents)  # hello
 
 
 main()
