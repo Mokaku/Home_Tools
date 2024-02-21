@@ -1,6 +1,5 @@
 import requests
 import json
-import datetime
 import sys
 from bs4 import BeautifulSoup
 
@@ -20,10 +19,8 @@ else:
 kakuyomu_url = "https://kakuyomu.jp"
 load_url = kakuyomu_url + "/works/" + novel_id
 html = requests.get(load_url)
+
 soup = BeautifulSoup(html.content, "html.parser")
-
-filename = '../../html/' + novel_id + '.html'
-
 ###################################################
 ## bt4 module 使い方メモ
 ###################################################
@@ -37,6 +34,8 @@ filename = '../../html/' + novel_id + '.html'
 # print(soup.find(id="__NEXT_DATA__").text)
 ###################################################
 
+
+filename = '../../novel_database/' + novel_id + '_test04.json'
 
 s = (soup.find(id="__NEXT_DATA__").text)
 j = json.loads(s)
@@ -66,6 +65,19 @@ html_footer = """
 """
 ###################################################
 
+def get_work_summary(f):
+	for key in rec01:
+		if ("Work:" in key):
+			# print(key)
+			if (work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
+				work_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
+				work_lastEpisodePublishedAt =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["lastEpisodePublishedAt"])
+				author_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["author"]["__ref"])
+				author_name =(j["props"]["pageProps"]["__APOLLO_STATE__"][author_id]["name"])			
+				author_activityName =(j["props"]["pageProps"]["__APOLLO_STATE__"][author_id]["activityName"])			
+				# work_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
+				print ({"id": work_id, "author_activityName": author_activityName, "title": work_title, "lastEpisodePublishedAt":work_lastEpisodePublishedAt}, file=f)
+
 
 def get_work_info(f):
 	for key in rec01:
@@ -77,18 +89,15 @@ def get_work_info(f):
 				print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" , file=f)
 
 def get_episode_info(f):
-	print ("<ul>", file=f)
 	for key in rec01:
 		if ("Episode" in key):
 			# print(key)
 			episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
 			episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-			episode_update_isodate =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["publishedAt"])
-			episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
 
-
-			print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date +"] <br></li>" , file=f)
-	print ("</ul>", file=f)
+			print ("<ul>", file=f)
+			print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a><br></li>" , file=f)
+			print ("</ul>", file=f)
 
 def get_chapter_info():
 	for chap_list_key in rec01:
@@ -131,34 +140,32 @@ def get_chapter_title(f):
 def get_title_element(ep_key ,f):
 	episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["title"])
 	episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["id"])
-	episode_update_isodate =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["publishedAt"])
-	episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
+	print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a><br></li>" , file=f)
 
-	print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date + "] <br></li>" , file=f)
 def main():
 
 	with open(filename, 'w') as f:
 
-		print (html_head, file=f)
-		get_work_info(f)
-		# print ( work_title + " (id:" + work_id + ")" )
+		# print (html_head, file=f)
+		get_work_summary(f)
+	# 	# print ( work_title + " (id:" + work_id + ")" )
 
 
-		## test チャプター有り無し判定により出力内容を変更する
-		if(len(j["props"]["pageProps"]["__APOLLO_STATE__"]["Work:" + work_id]["tableOfContents"])> 1):
-			# print("チャープターあり")
-			get_chapter_title(f)
-		else:
-			# print("チャープターなし")
-			get_episode_info(f)
+	# 	## test チャプター有り無し判定により出力内容を変更する
+	# 	if(len(j["props"]["pageProps"]["__APOLLO_STATE__"]["Work:" + work_id]["tableOfContents"])> 1):
+	# 		# print("チャープターあり")
+	# 		get_chapter_title(f)
+	# 	else:
+	# 		# print("チャープターなし")
+	# 		get_episode_info(f)
 
-		# get_chapter_info()
-		print (html_footer, file=f)
+	# 	# get_chapter_info()
+	# 	print (html_footer, file=f)
 
 		f.close()
 
-		with open(filename) as f:
-			contents = f.read()
+		with open(filename) as f2:
+			contents = f2.read()
 			print(contents)  # hello
 
 

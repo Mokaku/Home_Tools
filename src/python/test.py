@@ -19,10 +19,8 @@ else:
 kakuyomu_url = "https://kakuyomu.jp"
 load_url = kakuyomu_url + "/works/" + novel_id
 html = requests.get(load_url)
+
 soup = BeautifulSoup(html.content, "html.parser")
-
-filename = '../../html/' + novel_id + '.html'
-
 ###################################################
 ## bt4 module 使い方メモ
 ###################################################
@@ -36,6 +34,8 @@ filename = '../../html/' + novel_id + '.html'
 # print(soup.find(id="__NEXT_DATA__").text)
 ###################################################
 
+
+filename = '../../html/' + novel_id + '.html'
 
 s = (soup.find(id="__NEXT_DATA__").text)
 j = json.loads(s)
