@@ -1,0 +1,18 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+beautifulsoup4 = "*"
+datetime = "*"
+requests = "*"
+
+[dev-packages]
+flake8 = "*"
+autopep8 = "*"
+flake8-import-order = "*"
+ruff = "*"
+
+[requires]
+python_version = "3.9"
