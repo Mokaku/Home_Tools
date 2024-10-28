@@ -37,14 +37,21 @@ filename = '../../html/' + novel_id + '.html'
 # print(soup.find(id="__NEXT_DATA__").text)
 ###################################################
 
+if soup.find(id="__NEXT_DATA__"):
+	print("OK")
+	s = (soup.find(id="__NEXT_DATA__").text)
+	j = json.loads(s)
 
-s = (soup.find(id="__NEXT_DATA__").text)
-j = json.loads(s)
+	# s = (soup.find(id="__NEXT_DATA__").text)
+	# j = json.loads(s)
 
-rec01 = (j["props"]["pageProps"]["__APOLLO_STATE__"])
+	rec01 = (j["props"]["pageProps"]["__APOLLO_STATE__"])
+	work_id = (j["query"]["workId"])
+	work_title: str = ""
 
-work_id = (j["query"]["workId"])
-work_title: str = ""
+else:
+	print("############\nNovel ID:", novel_id, "\nThis Novel Contents does not Exist\n############")
+	sys.exit(0)
 
 ###################################################
 ## 出力用　HTML HEADER
@@ -67,19 +74,28 @@ html_footer = """
 ###################################################
 
 
-def get_work_info(f):
+def get_work_info():
+	global work_title,auther_id
 	for key in rec01:
-		if ("Work:" in key):
+		if (key.startswith('Work:')):
 			# print(key)
 			if (work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
 				work_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
-				# work_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-				print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" , file=f)
+				auther_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["author"]["__ref"])
+				# print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" , file=f)
+
+def GetAutherInfo(auther_id):
+	global auther_name
+	for key in rec01:
+		if (auther_id == key):
+			print("WORK_ID: ",work_id)
+			# print("WORK_KEY: ",work_key)
+			auther_name =(j["props"]["pageProps"]["__APOLLO_STATE__"][auther_id]["activityName"])
 
 def get_episode_info(f):
 	print ("<ul>", file=f)
 	for key in rec01:
-		if ("Episode" in key):
+		if ("Episode:" in key):
 			# print(key)
 			episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
 			episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
@@ -93,7 +109,7 @@ def get_episode_info(f):
 def get_chapter_info():
 	for chap_list_key in rec01:
 		# print (chap_list_key)
-		if ("TableOfContentsChapter" in chap_list_key):
+		if ("TableOfContentsChapter:" in chap_list_key):
 			cont_chapter_top =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["episodeUnions"][0]["__ref"])
 			cont_chapter_list =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["episodeUnions"])
 			cont_chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["id"])
@@ -140,7 +156,10 @@ def main():
 	with open(filename, 'w') as f:
 
 		print (html_head, file=f)
-		get_work_info(f)
+		get_work_info()
+		GetAutherInfo(auther_id)
+		print ("<h2>" +  work_title + " (id:" + work_id + ") by " + auther_name +  "</h2>" , file=f)
+
 		# print ( work_title + " (id:" + work_id + ")" )
 
 
