@@ -20,18 +20,20 @@ args = sys.argv
 source_dir="../../json_source"
 source_file="daysneo_da59da23660b4fa346e5717aed10e147.html"
 
-kakuyomu_url = "https://kakuyomu.jp"
+novel_url = "https://novel.daysneo.com"
+novel_id = "b80fcf5687b95c147f8f055a945bfa6b"
 
-# load_url = kakuyomu_url + "/works/" + novel_id
-source_file_name = source_dir + "/" + source_file
-# html = requests.get(load_url)
+load_url = novel_url + "/works/" + novel_id + ".html"
 
-with open(source_file_name) as f:
-	html = f.read()
+# source_file_name = source_dir + "/" + source_file
+html = requests.get(load_url)
+soup = BeautifulSoup(html.content, "html.parser")
 
-soup = BeautifulSoup(html, "html.parser")
+# with open(source_file_name) as f:
+# 	html = f.read()
+
+# soup = BeautifulSoup(html, "html.parser")
 # requests でソースを取得する場合は”．content”を付ける必要がある
-##soup = BeautifulSoup(html.content, "html.parser")
 
 
 
@@ -50,7 +52,17 @@ soup = BeautifulSoup(html, "html.parser")
 # print(soup.find(id="__NEXT_DATA__").text)
 ###################################################
 
-s = (soup.find(class_="contents"))
+# novel_all_contents = (soup.find(id="main"))
+novel_main_contents = (soup.find(class_="contents"))
+# content_title = novel_all_contents.find("h2")
+# novel_main_contents_01 = (novel_main_contents_00.replace(old, new))
+# print(novel_main_contents_00.replace(' ', ''))
+
+
+# print (novel_main_contents_00)
+
+# print (content_title)
+# print (novel_main_contents)
 
 ###############
 # findやfind_allの引数に「属性名='値'」を渡します。
@@ -58,12 +70,30 @@ s = (soup.find(class_="contents"))
 # ※classキーワードがPythonの予約語のため。
 ###############
 ##content_li = (s.find_all("li"), s.find("h4"))
-for content_li in (s.find_all("li")):
-	print("--------------------------------")
-	print(content_li)
-	content_link = (content_li.a)
-	content_url = (content_link.get("href"))
-	print(content_link)
+
+## Get Novel base info
+# novel_title = novel_head_contents.find("h2")
+
+print ("Title.--------------------------------")
+
+# print (novel_title)
+
+
+for content_li in (novel_main_contents.select("li li , li h4")):
+	content_link = content_li.find('a')
+	if content_link is None:
+		content_text = content_li.text
+		content_url = ""
+		# continue
+	else:
+		content_url = content_link.get("href")
+		content_text = content_link.text
+	# print("1.--------------------------------")
+	# print(content_li.text)
+	# print("2.--------------------------------")
+	# print(content_link)
+	print(content_text,".--------------------------------")
+	print(novel_url + content_url)
 
 
 
@@ -96,78 +126,81 @@ html_footer = """
 ###################################################
 
 
-def get_work_info(f):
-	for key in rec01:
-		if ("Work:" in key):
-			# print(key)
-			if (work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
-				work_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
-				# work_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-				print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" , file=f)
+# def get_work_info(f):
+# 	for key in rec01:
+# 		if ("Work:" in key):
+# 			# print(key)
+# 			if (work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
+# 				work_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
+# 				# work_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
+# 				print ("<h2>" +  work_title + " (id:" + work_id + ") </h2>" , file=f)
 
-def get_episode_info(f):
-	print ("<ul>", file=f)
-	for key in rec01:
-		if ("Episode" in key):
-			# print(key)
-			episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
-			episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-			episode_update_isodate =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["publishedAt"])
-			episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
-
-
-			print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date +"] <br></li>" , file=f)
-	print ("</ul>", file=f)
-
-def get_chapter_info():
-	for chap_list_key in rec01:
-		# print (chap_list_key)
-		if ("TableOfContentsChapter" in chap_list_key):
-			cont_chapter_top =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["episodeUnions"][0]["__ref"])
-			cont_chapter_list =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["episodeUnions"])
-			cont_chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["id"])
-			print (cont_chapter_id,cont_chapter_top)
-			print (cont_chapter_list)
-		else:
-			pass
-			# 	chapter_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
-			# 	chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-			# 	print (chapter_id, chapter_title)
-
-def get_chapter_title(f):
-	for key in rec01:
-		if ("Chapter" in key):
-			# print(key)
-			# print(key.find("Chapter"))
-			if(key.find("Chapter") == 0):
-				chapter_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
-				chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
-				cont_chapter_list =(j["props"]["pageProps"]["__APOLLO_STATE__"]["TableOfContentsChapter:" + chapter_id]["episodeUnions"])
-
-				# print (key,chapter_id, chapter_title)
-				print ("<h3>" + chapter_title + "</h3>", file=f)
-				print ("<ul>", file=f)
-				for list_key in cont_chapter_list:
-					# print (list_key)
-					ep_key=list_key["__ref"]
-					# print (ep_key)
-					get_title_element(ep_key, f)
-				print ("</ul>", file=f)
+# def get_episode_info(f):
+# 	print ("<ul>", file=f)
+# 	for key in rec01:
+# 		if ("Episode" in key):
+# 			# print(key)
+# 			episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
+# 			episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
+# 			episode_update_isodate =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["publishedAt"])
+# 			episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
 
 
-			# 	print (chapter_id, chapter_title)
+# 			print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date +"] <br></li>" , file=f)
+# 	print ("</ul>", file=f)
 
-def get_title_element(ep_key ,f):
-	episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["title"])
-	episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["id"])
-	episode_update_isodate =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["publishedAt"])
-	episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
+# def get_chapter_info():
+# 	for chap_list_key in rec01:
+# 		# print (chap_list_key)
+# 		if ("TableOfContentsChapter" in chap_list_key):
+# 			cont_chapter_top =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["episodeUnions"][0]["__ref"])
+# 			cont_chapter_list =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["episodeUnions"])
+# 			cont_chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][chap_list_key]["id"])
+# 			print (cont_chapter_id,cont_chapter_top)
+# 			print (cont_chapter_list)
+# 		else:
+# 			pass
+# 			# 	chapter_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
+# 			# 	chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
+# 			# 	print (chapter_id, chapter_title)
 
-	print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date + "] <br></li>" , file=f)
+# def get_chapter_title(f):
+# 	for key in rec01:
+# 		if ("Chapter" in key):
+# 			# print(key)
+# 			# print(key.find("Chapter"))
+# 			if(key.find("Chapter") == 0):
+# 				chapter_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
+# 				chapter_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])
+# 				cont_chapter_list =(j["props"]["pageProps"]["__APOLLO_STATE__"]["TableOfContentsChapter:" + chapter_id]["episodeUnions"])
+
+# 				# print (key,chapter_id, chapter_title)
+# 				print ("<h3>" + chapter_title + "</h3>", file=f)
+# 				print ("<ul>", file=f)
+# 				for list_key in cont_chapter_list:
+# 					# print (list_key)
+# 					ep_key=list_key["__ref"]
+# 					# print (ep_key)
+# 					get_title_element(ep_key, f)
+# 				print ("</ul>", file=f)
+
+
+# 			# 	print (chapter_id, chapter_title)
+
+# def get_title_element(ep_key ,f):
+# 	episode_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["title"])
+# 	episode_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["id"])
+# 	episode_update_isodate =(j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["publishedAt"])
+# 	episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
+
+# 	print ("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date + "] <br></li>" , file=f)
+
+
 def main():
 
-	print(source_file_name)
-	print(content_link)
+	print("#################")
+	# print(source_file_name)
+	# print(content_link)
 	# with open(filename, 'w') as f:
 
 	# 	print (html_head, file=f)

@@ -70,25 +70,32 @@ html_footer = """
 """
 ###################################################
 
+class GetBaseNobelInfo():
 
-def only_get_work_info():
-	global work_title,auther_id
-	for key in rec01:
-		# if ("Work:" in key):
-		if (key.startswith('Work:')):
-			if (work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
-				print("WORK_ID: ",work_id)
-				# print("WORK_KEY: ",work_key)
-				work_title =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
-				auther_id =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["author"]["__ref"])
+	def __init__(self,work_id,rec01):
+		self.__work_id = work_id
+		self.__rec01 = rec01
+		self.__auther_id = self.get_auther_id()
 
-def only_get_auther_info(auther_id):
-	global auther_name
-	for key in rec01:
-		if (auther_id == key):
-			print("WORK_ID: ",work_id)
-			# print("WORK_KEY: ",work_key)
-			auther_name =(j["props"]["pageProps"]["__APOLLO_STATE__"][auther_id]["activityName"])
+	def only_get_work_title(self):
+		for key in self.__rec01:
+			if (key.startswith('Work:')):
+				if (self.__work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
+					# print("WORK_KEY: ",work_key)
+					return (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["title"])
+
+	def get_auther_id(self):
+		for key in self.__rec01:
+			if (key.startswith('Work:')):
+				if (self.__work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
+					# print("WORK_KEY: ",work_key)
+					return (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["author"]["__ref"])
+
+
+	def only_get_auther_name(self):
+		for key in self.__rec01:
+			if (self.__auther_id == key):
+				return (j["props"]["pageProps"]["__APOLLO_STATE__"][self.__auther_id]["activityName"])
 
 
 def get_work_info(f):
@@ -164,15 +171,16 @@ def get_title_element(ep_key ,f):
 # MAIN START
 def main():
 
-	only_get_work_info()
-	only_get_auther_info(auther_id)
+	# only_get_work_info()
+	# only_get_auther_info(auther_id)
+	novel_info = GetBaseNobelInfo(work_id,rec01)
 
-	print("## WorkId ##############")
-	title_id_name = work_id.format().split()
-	print("\"",work_id.format().split(),"\"")
-	print("TITLE \"",work_title,"\"")
-	print("AUTHER_ID \"",auther_id,"\"")
-	print("AUTHER_NAME \"",auther_name,"\"")
+	print("################")
+	# title_id_name = work_id.format().split()
+	print("WorkId: \"",work_id.format().split(),"\"")
+	print("TITLE: \"",novel_info.only_get_work_title(),"\"")
+	print("AUTHER_ID: \"",novel_info.get_auther_id(),"\"")
+	print("AUTHER_NAME: \"",novel_info.only_get_auther_name(),"\"")
 
 
 
