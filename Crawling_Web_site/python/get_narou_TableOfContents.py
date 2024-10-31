@@ -21,8 +21,14 @@ source_dir="../../json_source"
 source_file="daysneo_da59da23660b4fa346e5717aed10e147.html"
 
 novel_url = "https://ncode.syosetu.com"
-novel_id = "n6453iq" # 春暁記
+
+#########################
+## なろう小説ID(for test)##
+#########################
+# novel_id = "n6453iq" # 春暁記
 # novel_id = "n3289ds" # のんびり農家
+novel_id = "n1146do" # 捨て子になりましたが、魔法のおかげで大丈夫そうです
+
 
 
 ## なろうサイトではUAが存在していないとデータが取得できない(403で返る）ためにUAを設定
@@ -72,9 +78,22 @@ id_counter = 1
 # print(soup.find(id="__NEXT_DATA__").text)
 ###################################################
 
+def get_novel_base_info():
+	novel_series = (soup.find(class_= "p-novel__series"))
+	if novel_series == None:
+		novel_series_name = "N/A"
+	else:
+		novel_series_name = novel_series.text.strip() # type: ignore
+	# print (novel_series_name)
+	novel_title = (soup.find(class_= "p-novel__title")).text.strip() # type: ignore
+	# print (novel_title)
+	novel_auther = (soup.find(class_= "p-novel__author")).text.strip() # type: ignore
+	return ( [novel_series_name,novel_title,novel_auther] )
+
+
 def get_page_counts():
 	novel_page_contents = (soup.find("div" , class_= "c-pager"))
-	last_page_line = (novel_page_contents.find("a", class_="c-pager__item c-pager__item--last"))
+	last_page_line = (novel_page_contents.find("a", class_="c-pager__item c-pager__item--last")) # type: ignore
 	last_page_url = last_page_line["href"]
 	last_page_num = last_page_url.split('?')[1].split('=')[1]
 	# print("Section.--------------------------------")
@@ -89,19 +108,33 @@ def get_all_pages(page_num):
 	ep_num=int(1)
 	page_num = int(page_num) + 1
 	for get_page_num in range(1, page_num):
-		print ("Page:",get_page_num,"#-----")
+		# print ("Page:",get_page_num,"#-----")
 		_load_url = "{}/{}/?p={}".format(novel_url,novel_id,get_page_num)
 		l_html = requests.get(_load_url , headers = ua_headers)
 		l_soup = BeautifulSoup(l_html.content, "html.parser")
 		novel_main_contents = (l_soup.find("div" , class_= "p-eplist"))
-		# novel_ep_contents_list = (novel_main_contents.select("div" , class_= "p-eplist__subtitle"))
-		novel_ep_contents_list = (novel_main_contents.select('a'))
+		# novel_ep_contents_list = (novel_main_contents.find("div" , class_= "p-eplist__subtitle"))
+		novel_ep_contents_list = (novel_main_contents.find_all(class_=['p-eplist__chapter-title','p-eplist__sublist']))
+		# print ("-----------------------")	
+		# print (novel_ep_contents_list)	
+		# novel_ep_contents_list = (novel_main_contents.select('a'))
 		for key in novel_ep_contents_list:
-			# print ("#",key)	
-			novel_sub_url = (novel_url + key.get("href"))
-			novel_sub_title = key.text.strip()
-			print ('episode {} : {},{}'.format(ep_num, novel_sub_title, novel_sub_url))
-			ep_num = ep_num+1
+			# print ("### -----------------------")	
+			# print ("#1",key)
+			# print ("------------")	
+			if (key.find(class_="p-eplist__subtitle")) == None:
+				key_cp_title = key.text.strip()
+				print(key_cp_title)
+			else:
+				key_link = (key.find(class_="p-eplist__subtitle"))
+				key_update_date = (key.find(class_="p-eplist__update"))
+				# print ("#2",key_link," / ",key_update_date)	
+				# print ("------------")	
+				novel_sub_url = (novel_url + key_link.get("href"))
+				novel_sub_title = key_link.text.strip()
+				novel_sub_update = key_update_date.text.strip().replace("\n","")
+				print ('episode {} : {}, {}, {} '.format(ep_num, novel_sub_title, novel_sub_url,novel_sub_update))
+				ep_num = ep_num+1
 		# print ("end_of_Page:",get_page_num, _load_url ,"#-----")
 
 
@@ -185,10 +218,20 @@ def main():
 
 
 	novel_page = GetPagerContents(soup)
+
+	#########################
+	## 作品情報取得          ##
+	#########################
 	print ("Title.--------------------------------")
-	print (get_page_counts())
+	print ( get_novel_base_info()[0] )
+	print ( get_novel_base_info()[1] )
+	print ( get_novel_base_info()[2] )
+	print ("All Page Count : ",get_page_counts())
 	page_num = (get_page_counts())
 
+	#########################
+	## 目次リストの取得       ##
+	#########################
 	get_all_pages(page_num)
 
 
