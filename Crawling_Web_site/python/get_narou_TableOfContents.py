@@ -6,34 +6,36 @@ from bs4 import BeautifulSoup
 
 args = sys.argv
 
-# print(args[1])
-# print(len(args))
+print(args[1])
+print(len(args))
 
-# if 2 <= len(args):
-# 	if args[1].isdigit():
-# 		novel_id = args[1]
-# 	else:
-# 		print('Argument is not digit')
-# else:
-# 	print('Arguments are too short')
+if 2 <= len(args):
+	novel_id = args[1]
+	# if args[1].isdigit():
+	# 	novel_id = args[1]
+	# else:
+	# 	print('Argument is not digit')
+else:
+	print('Arguments are too short')
 
 source_dir="../../json_source"
 source_file="daysneo_da59da23660b4fa346e5717aed10e147.html"
 
 novel_url = "https://ncode.syosetu.com"
+prefix = "narou_"
+
+## なろうサイトではUAが存在していないとデータが取得できない(403で返る）ためにUAを設定
+ua_headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0"}
 
 #########################
 ## なろう小説ID(for test)##
 #########################
 # novel_id = "n6453iq" # 春暁記
 # novel_id = "n3289ds" # のんびり農家
-novel_id = "n1146do" # 捨て子になりましたが、魔法のおかげで大丈夫そうです
+# novel_id = "n1146do" # 捨て子になりましたが、魔法のおかげで大丈夫そうです
 # novel_id = "2710db" #とんでもスキルで異世界放浪メシ
+# novel_id = "n9636x" #薬屋のひとりごと
 
-
-
-## なろうサイトではUAが存在していないとデータが取得できない(403で返る）ためにUAを設定
-ua_headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:61.0) Gecko/20100101 Firefox/61.0"}
 
 
 # https://ncode.syosetu.com/n6453iq/
@@ -48,23 +50,11 @@ soup = BeautifulSoup(html.content, "html.parser")
 json_data = []
 id_counter = 1
 
-# ## URLから正常にhtmlが取得できるかのテスト
-# print ("URL.--------------------------------")
-# print(load_url)
-# print ("soup.--------------------------------")
-# print(soup)
-# print ("end_of_soup.--------------------------------")
-
-
-# with open(source_file_name) as f:
-# 	html = f.read()
-
 # soup = BeautifulSoup(html, "html.parser")
 # requests でソースを取得する場合は”．content”を付ける必要がある
 
-
-
-# filename = '../../html/' + novel_id + '.html'
+json_filename = '../../html/narou/json/' + prefix + novel_id + '.json'
+html_filename = '../../html/narou/' + prefix + novel_id + '.html'
 
 ###################################################
 ## bt4 module 使い方メモ
@@ -97,6 +87,7 @@ def get_page_counts():
 	last_page_line = (novel_page_contents.find("a", class_="c-pager__item c-pager__item--last")) # type: ignore
 	last_page_url = last_page_line["href"]
 	last_page_num = last_page_url.split('?')[1].split('=')[1]
+	## debug ###
 	# print("Section.--------------------------------")
 	# print (novel_main_contents)
 	# print("Line.--------------------------------")
@@ -105,12 +96,17 @@ def get_page_counts():
 	# print (last_page_url)
 	return (last_page_num)
 
-def get_all_pages(page_num,novel_title,novel_series_name,novel_auther):
+def get_all_pages(page_num,novel_series_name, novel_title, novel_auther):
 	ep_num=int(1)
 	chp_num=int(1)
 	page_num = int(page_num) + 1
+	contents_json = {        "__typename": "Story","id": novel_id,"serieis": novel_series_name, "title": novel_title, "AutherName": novel_auther,}
 
-	contents_json = {        "__typename": "Story","id": novel_id,"title": novel_title, "serieis": novel_series_name, "AutherName": novel_auther,}
+	## Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
+	chapter_json_name = "Chapters_1"
+	ep_list = []
+	chapter_json = { "__typename": "Chapter", "chp_num": "", "ChapterName": "", "Episode": ep_list } 
+
 	for get_page_num in range(1, page_num):
 		# print ("Page:",get_page_num,"#-----")
 		_load_url = "{}/{}/?p={}".format(novel_url,novel_id,get_page_num)
@@ -122,10 +118,7 @@ def get_all_pages(page_num,novel_title,novel_series_name,novel_auther):
 		# print ("-----------------------")	
 		# print (novel_ep_contents_list)	
 		# novel_ep_contents_list = (novel_main_contents.select('a'))
-		## Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
-		chapter_json_name = ""
-		ep_list = []
-		chapter_json = { "__typename": "Chapter", "chp_num": "", "ChapterName": "", "Episode": ep_list } 
+
 		for key in novel_ep_contents_list:
 			# print ("### -----------------------")	
 			# print ("#1",key)
@@ -157,6 +150,46 @@ def get_all_pages(page_num,novel_title,novel_series_name,novel_auther):
 	# print (chapter_json_name)
 	return (contents_json)
 
+def create_html_file(list_dict,f_html):
+
+
+	###################################################
+	## 出力用　HTML HEADER
+
+	html_head = """
+	<!DOCTYPE html>
+	<html lang=ja>
+	<html><head><title>{}(id:{})</title></head>
+	<body>
+	<h1>目次</h1>
+	""".format(list_dict['title'],list_dict['id']).strip()
+
+	###################################################
+	## 出力用　HTML FOOTER
+
+	html_footer = """
+	</body>
+	</html>
+	"""
+	###################################################
+	
+
+	print (html_head, file=f_html)
+
+	print ("<h2>" , list_dict['title'] , " (id:",list_dict['id'],") </h2>" , file=f_html)
+	print ("<h2> by <a href=\"" , load_url, "\">" , list_dict['AutherName'] , "</a> </h2>" , file=f_html)
+
+
+	for chap_list_key in list_dict:
+		if ("Chapters_" in chap_list_key):
+			ep_arry = (list_dict[chap_list_key])	
+			# print (ep_arry)
+			print ('<h3>CHapter: {} {}</h3>'.format(ep_arry['chp_num'], ep_arry['ChapterName']), file=f_html)
+			# print ('<ul>')
+			for ep_info in ep_arry['Episode']:
+				print ('<li>Episode:{} <a href="{}">{}</a> /{}</li>'.format(ep_info['ep_num'], ep_info['url'], ep_info['title'], ep_info['publishedAt']), file=f_html)
+			print ('</ul>', file=f_html)
+	print (html_footer, file=f_html)
 
 
 class GetPagerContents():
@@ -171,73 +204,13 @@ class GetPagerContents():
 	#	return (last_page_num)
 	# 	#	return (novel_main_contents)
 
-# print (content_title)
-# print (novel_main_contents)
-
-###############
-# findやfind_allの引数に「属性名='値'」を渡します。
-# ※classを検索するときにはアンダースコアを付与します（class_）。
-# ※classキーワードがPythonの予約語のため。
-###############
-##content_li = (s.find_all("li"), s.find("h4"))
-
-## Get Novel base info
-# novel_title = novel_head_contents.find("h2")
-
-# print (novel_title)
-
-
-# for content_li in (novel_main_contents.select("li li , li h4")):
-# 	content_link = content_li.find('a')
-# 	if content_link is None:
-# 		content_text = content_li.text
-# 		content_url = ""
-# 		# continue
-# 	else:
-# 		content_url = content_link.get("href")
-# 		content_text = content_link.text
-# 	# print("1.--------------------------------")
-# 	# print(content_li.text)
-# 	# print("2.--------------------------------")
-# 	# print(content_link)
-# 	print(content_text,".--------------------------------")
-# 	print(novel_url + content_url)
-
-
-
-# s = (soup.find(id="__NEXT_DATA__").text)
-# j = json.loads(s)
-
-# rec01 = (j["props"]["pageProps"]["__APOLLO_STATE__"])
-
-# work_id = (j["query"]["workId"])
-# work_title: str = ""
-
-###################################################
-## 出力用　HTML HEADER
-
-# html_head = """
-# <!DOCTYPE html>
-# <html lang=ja>
-# <html><head><title>id: {title_id}</title></head>
-# <body>
-# <h1>目次</h1>
-# """.format(title_id=work_id).strip()
-
-###################################################
-## 出力用　HTML FOOTER
-
-html_footer = """
-</body>
-</html>
-"""
-###################################################
-
 
 def main():
 
 
 	novel_page = GetPagerContents(soup)
+
+	
 
 	#########################
 	## 作品情報取得          ##
@@ -255,14 +228,21 @@ def main():
 
 	print("#################")
 	#########################
-	## 目次リストの取得       ##
+	## 目次リストの取得(JSON)       ##
 	#########################
-	get_all_pages(page_num,novel_series_name,novel_title,novel_auther)
+	list_dict = get_all_pages(page_num,novel_series_name,novel_title,novel_auther)
 
+	with open(json_filename, 'w') as f:
+		print (json.dumps(get_all_pages(page_num,novel_series_name,novel_title,novel_auther),indent=4, ensure_ascii=False) , file=f)
+		f.close()
 
-	print (json.dumps(get_all_pages(page_num,novel_series_name,novel_title,novel_auther),indent=2, ensure_ascii=False))
+		# with open(json_filename) as f:
+		# 	contents = f.read()
+		# 	print(contents)  # hello
 
-
+	with open(html_filename, 'w') as f_html:
+		create_html_file(list_dict,f_html)
+		f.close()
 
 
 main()
