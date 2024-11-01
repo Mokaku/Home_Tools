@@ -28,6 +28,7 @@ novel_url = "https://ncode.syosetu.com"
 # novel_id = "n6453iq" # 春暁記
 # novel_id = "n3289ds" # のんびり農家
 novel_id = "n1146do" # 捨て子になりましたが、魔法のおかげで大丈夫そうです
+# novel_id = "2710db" #とんでもスキルで異世界放浪メシ
 
 
 
@@ -104,9 +105,12 @@ def get_page_counts():
 	# print (last_page_url)
 	return (last_page_num)
 
-def get_all_pages(page_num):
+def get_all_pages(page_num,novel_title,novel_series_name,novel_auther):
 	ep_num=int(1)
+	chp_num=int(1)
 	page_num = int(page_num) + 1
+
+	contents_json = {        "__typename": "Story","id": novel_id,"title": novel_title, "serieis": novel_series_name, "AutherName": novel_auther,}
 	for get_page_num in range(1, page_num):
 		# print ("Page:",get_page_num,"#-----")
 		_load_url = "{}/{}/?p={}".format(novel_url,novel_id,get_page_num)
@@ -118,13 +122,23 @@ def get_all_pages(page_num):
 		# print ("-----------------------")	
 		# print (novel_ep_contents_list)	
 		# novel_ep_contents_list = (novel_main_contents.select('a'))
+		## Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
+		chapter_json_name = ""
+		ep_list = []
+		chapter_json = { "__typename": "Chapter", "chp_num": "", "ChapterName": "", "Episode": ep_list } 
 		for key in novel_ep_contents_list:
 			# print ("### -----------------------")	
 			# print ("#1",key)
 			# print ("------------")	
 			if (key.find(class_="p-eplist__subtitle")) == None:
 				key_cp_title = key.text.strip()
-				print(key_cp_title)
+				chapter_json_name = '{}_{}'.format("Chapters",chp_num)
+				## Chapterの存在するNovelの場合、章分割のために ep_list とchapter_jsonを再度初期化。
+				ep_list = []
+				chapter_json = { "__typename": "Chapter", "chp_num": chp_num, "ChapterName": key_cp_title, "Episode": ep_list } 
+				# print('Chapter {} {}'.format(chp_num,key_cp_title))
+				# print( chapter_json )
+				chp_num = chp_num+1
 			else:
 				key_link = (key.find(class_="p-eplist__subtitle"))
 				key_update_date = (key.find(class_="p-eplist__update"))
@@ -133,9 +147,15 @@ def get_all_pages(page_num):
 				novel_sub_url = (novel_url + key_link.get("href"))
 				novel_sub_title = key_link.text.strip()
 				novel_sub_update = key_update_date.text.strip().replace("\n","")
-				print ('episode {} : {}, {}, {} '.format(ep_num, novel_sub_title, novel_sub_url,novel_sub_update))
+				ep_list.append( {"__typename": "Episode","ep_num": ep_num, "url": novel_sub_url, "title": novel_sub_title, "publishedAt":novel_sub_update} ) 
+				chapter_json["Episode"] = ep_list
+				contents_json[chapter_json_name] = chapter_json
+				# print ('episode {} : {}, {}, {} '.format(ep_num, novel_sub_title, novel_sub_url,novel_sub_update))
+				# print (chapter_json)
 				ep_num = ep_num+1
 		# print ("end_of_Page:",get_page_num, _load_url ,"#-----")
+	# print (chapter_json_name)
+	return (contents_json)
 
 
 
@@ -223,19 +243,25 @@ def main():
 	## 作品情報取得          ##
 	#########################
 	print ("Title.--------------------------------")
-	print ( get_novel_base_info()[0] )
-	print ( get_novel_base_info()[1] )
-	print ( get_novel_base_info()[2] )
 	print ("All Page Count : ",get_page_counts())
 	page_num = (get_page_counts())
 
+	novel_series_name = get_novel_base_info()[0]
+	novel_title = get_novel_base_info()[1]
+	novel_auther =get_novel_base_info()[2]
+	print ("シリーズ名:", novel_series_name )
+	print ("タイトル:", novel_title )
+	print ("作者:", novel_auther )
+
+	print("#################")
 	#########################
 	## 目次リストの取得       ##
 	#########################
-	get_all_pages(page_num)
+	get_all_pages(page_num,novel_series_name,novel_title,novel_auther)
 
 
-	print("#################")
+	print (json.dumps(get_all_pages(page_num,novel_series_name,novel_title,novel_auther),indent=2, ensure_ascii=False))
+
 
 
 
