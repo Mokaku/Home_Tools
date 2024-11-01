@@ -39,7 +39,7 @@ filename = '../../html/' + novel_id + '.html'
 
 if soup.find(id="__NEXT_DATA__"):
 	print("OK")
-	s = (soup.find(id="__NEXT_DATA__").text)
+	s = (soup.find(id="__NEXT_DATA__").text) # type: ignore
 	j = json.loads(s)
 else:
 	print("############\nNovel ID:", novel_id, "\nThis Novel Contents does not Exist\n############")

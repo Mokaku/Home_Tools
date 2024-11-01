@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 
 args = sys.argv
 
-print(args[1])
-print(len(args))
+# print(args[1])
+# print(len(args))
 
 if 2 <= len(args):
 	novel_id = args[1]
@@ -79,14 +79,14 @@ def get_novel_base_info():
 	novel_title = (soup.find(class_= "p-novel__title")).text.strip() # type: ignore
 	# print (novel_title)
 	novel_auther = (soup.find(class_= "p-novel__author")).text.strip() # type: ignore
-	return ( [novel_series_name,novel_title,novel_auther] )
+	return ( [novel_series_name, novel_title, novel_auther] )
 
 
 def get_page_counts():
 	novel_page_contents = (soup.find("div" , class_= "c-pager"))
 	last_page_line = (novel_page_contents.find("a", class_="c-pager__item c-pager__item--last")) # type: ignore
-	last_page_url = last_page_line["href"]
-	last_page_num = last_page_url.split('?')[1].split('=')[1]
+	last_page_url = last_page_line["href"] # type: ignore
+	last_page_num = last_page_url.split('?')[1].split('=')[1] # type: ignore
 	## debug ###
 	# print("Section.--------------------------------")
 	# print (novel_main_contents)
@@ -95,6 +95,31 @@ def get_page_counts():
 	# print("num.--------------------------------")
 	# print (last_page_url)
 	return (last_page_num)
+
+def create_novel_json(key,chp_num,contents_json,ep_num,ep_list,chapter_json,chapter_json_name):
+	if (key.find(class_="p-eplist__subtitle")) == None:
+		key_cp_title = key.text.strip()
+		chapter_json_name = '{}_{}'.format("Chapters",chp_num)
+		## Chapterの存在するNovelの場合、章分割のために ep_list とchapter_jsonを再度初期化。
+		ep_list = []
+		chapter_json = { "__typename": "Chapter", "chp_num": chp_num, "ChapterName": key_cp_title, "Episode": ep_list } 
+		# print('Chapter {} {}'.format(chp_num,key_cp_title))
+		# print( chapter_json )
+		chp_num = chp_num+1
+	else:
+		key_link = (key.find(class_="p-eplist__subtitle"))
+		key_update_date = (key.find(class_="p-eplist__update"))
+		# print ("#2",key_link," / ",key_update_date)	
+		# print ("------------")	
+		novel_sub_url = (novel_url + key_link.get("href"))
+		novel_sub_title = key_link.text.strip()
+		novel_sub_update = key_update_date.text.strip().replace("\n","")
+		ep_list.append( {"__typename": "Episode","ep_num": ep_num, "url": novel_sub_url, "title": novel_sub_title, "publishedAt":novel_sub_update} ) 
+		chapter_json["Episode"] = ep_list
+		contents_json[chapter_json_name] = chapter_json
+		# print ('episode {} : {}, {}, {} '.format(ep_num, novel_sub_title, novel_sub_url,novel_sub_update))
+		# print (chapter_json)
+		ep_num = ep_num+1
 
 def get_all_pages(page_num,novel_series_name, novel_title, novel_auther):
 	ep_num=int(1)
@@ -114,7 +139,7 @@ def get_all_pages(page_num,novel_series_name, novel_title, novel_auther):
 		l_soup = BeautifulSoup(l_html.content, "html.parser")
 		novel_main_contents = (l_soup.find("div" , class_= "p-eplist"))
 		# novel_ep_contents_list = (novel_main_contents.find("div" , class_= "p-eplist__subtitle"))
-		novel_ep_contents_list = (novel_main_contents.find_all(class_=['p-eplist__chapter-title','p-eplist__sublist']))
+		novel_ep_contents_list = (novel_main_contents.find_all(class_=['p-eplist__chapter-title','p-eplist__sublist'])) # type: ignore
 		# print ("-----------------------")	
 		# print (novel_ep_contents_list)	
 		# novel_ep_contents_list = (novel_main_contents.select('a'))
@@ -123,35 +148,12 @@ def get_all_pages(page_num,novel_series_name, novel_title, novel_auther):
 			# print ("### -----------------------")	
 			# print ("#1",key)
 			# print ("------------")	
-			if (key.find(class_="p-eplist__subtitle")) == None:
-				key_cp_title = key.text.strip()
-				chapter_json_name = '{}_{}'.format("Chapters",chp_num)
-				## Chapterの存在するNovelの場合、章分割のために ep_list とchapter_jsonを再度初期化。
-				ep_list = []
-				chapter_json = { "__typename": "Chapter", "chp_num": chp_num, "ChapterName": key_cp_title, "Episode": ep_list } 
-				# print('Chapter {} {}'.format(chp_num,key_cp_title))
-				# print( chapter_json )
-				chp_num = chp_num+1
-			else:
-				key_link = (key.find(class_="p-eplist__subtitle"))
-				key_update_date = (key.find(class_="p-eplist__update"))
-				# print ("#2",key_link," / ",key_update_date)	
-				# print ("------------")	
-				novel_sub_url = (novel_url + key_link.get("href"))
-				novel_sub_title = key_link.text.strip()
-				novel_sub_update = key_update_date.text.strip().replace("\n","")
-				ep_list.append( {"__typename": "Episode","ep_num": ep_num, "url": novel_sub_url, "title": novel_sub_title, "publishedAt":novel_sub_update} ) 
-				chapter_json["Episode"] = ep_list
-				contents_json[chapter_json_name] = chapter_json
-				# print ('episode {} : {}, {}, {} '.format(ep_num, novel_sub_title, novel_sub_url,novel_sub_update))
-				# print (chapter_json)
-				ep_num = ep_num+1
+			create_novel_json(key,chp_num,contents_json,ep_num,ep_list,chapter_json,chapter_json_name)
 		# print ("end_of_Page:",get_page_num, _load_url ,"#-----")
 	# print (chapter_json_name)
 	return (contents_json)
 
 def create_html_file(list_dict,f_html):
-
 
 	###################################################
 	## 出力用　HTML HEADER
@@ -236,6 +238,7 @@ def main():
 		print (json.dumps(get_all_pages(page_num,novel_series_name,novel_title,novel_auther),indent=4, ensure_ascii=False) , file=f)
 		f.close()
 
+		## Debug 確認表示用 ###
 		# with open(json_filename) as f:
 		# 	contents = f.read()
 		# 	print(contents)  # hello

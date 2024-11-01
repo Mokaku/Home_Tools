@@ -19,11 +19,13 @@ else:
 
 kakuyomu_url = "https://kakuyomu.jp"
 kakuyomu_user_page_url = "https://kakuyomu.jp/users"
+prefix = "kakuyomu_"
+
 load_url = kakuyomu_url + "/works/" + novel_id
 html = requests.get(load_url)
 soup = BeautifulSoup(html.content, "html.parser")
 
-filename = '../../html/' + novel_id + '.html'
+filename = '../../html/' + prefix + novel_id + '.html'
 
 ###################################################
 ## bt4 module 使い方メモ
@@ -40,7 +42,7 @@ filename = '../../html/' + novel_id + '.html'
 
 if soup.find(id="__NEXT_DATA__"):
 	print("OK")
-	j = json.loads(soup.find(id="__NEXT_DATA__").text)
+	j = json.loads(soup.find(id="__NEXT_DATA__").text) # type: ignore
 
 	rec01 = (j["props"]["pageProps"]["__APOLLO_STATE__"])
 	work_id = (j["query"]["workId"])
@@ -168,6 +170,8 @@ def main():
 	"""
 	###################################################
 
+	info_text = '{}: {}'
+	print(info_text.format(work_id,novel_info.only_get_work_title()))
 
 	with open(filename, 'w') as f:
 
@@ -191,8 +195,8 @@ def main():
 
 		f.close()
 
-		with open(filename) as f:
-			contents = f.read()
-			print(contents)  # hello
+		# with open(filename) as f:
+		# 	contents = f.read()
+		# 	print(contents)  # hello
 
 main()

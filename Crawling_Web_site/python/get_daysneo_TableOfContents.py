@@ -79,21 +79,21 @@ print ("Title.--------------------------------")
 # print (novel_title)
 
 
-for content_li in (novel_main_contents.select("li li , li h4")):
+for content_li in (novel_main_contents.select("li li , li h4")): # type: ignore
 	content_link = content_li.find('a')
 	if content_link is None:
 		content_text = content_li.text
 		content_url = ""
 		# continue
 	else:
-		content_url = content_link.get("href")
+		content_url = content_link.get("href") # type: ignore
 		content_text = content_link.text
 	# print("1.--------------------------------")
 	# print(content_li.text)
 	# print("2.--------------------------------")
 	# print(content_link)
 	print(content_text,".--------------------------------")
-	print(novel_url + content_url)
+	print(novel_url + content_url) # type: ignore
 
 
 
