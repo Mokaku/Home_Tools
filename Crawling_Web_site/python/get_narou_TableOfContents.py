@@ -83,9 +83,12 @@ def get_novel_base_info():
 
 def get_page_counts():
     novel_page_contents = (soup.find("div", class_="c-pager"))
-    last_page_line = (novel_page_contents.find("a", class_="c-pager__item c-pager__item--last"))  # type: ignore
-    last_page_url = last_page_line["href"]  # type: ignore
-    last_page_num = last_page_url.split('?')[1].split('=')[1]  # type: ignore
+    if novel_page_contents is None:
+        last_page_num = 1
+    else:
+        last_page_line = (novel_page_contents.find("a", class_="c-pager__item c-pager__item--last"))  # type: ignore
+        last_page_url = last_page_line["href"]  # type: ignore
+        last_page_num = last_page_url.split('?')[1].split('=')[1]  # type: ignore
     # debug ###
     # print("Section.--------------------------------")
     # print (novel_main_contents)
