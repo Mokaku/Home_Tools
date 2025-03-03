@@ -1,9 +1,11 @@
-import requests
-import json
 import datetime
-import sys
-from bs4 import BeautifulSoup
+import json
 import os
+import sys
+
+from bs4 import BeautifulSoup
+
+import requests
 
 args = sys.argv
 
@@ -27,7 +29,7 @@ html = requests.get(load_url)
 soup = BeautifulSoup(html.content, "html.parser")
 
 filename = '../../html/' + prefix + novel_id + '.html'
-## home_dir = '/home/htobe'
+# home_dir = '/home/htobe'
 home_dir = os.environ['HOME']
 
 ###################################################
@@ -98,7 +100,9 @@ def get_episode_info(f):
             episode_update_isodate = (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["publishedAt"])
             episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
 
-            print("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date + "] <br></li>", file=f)
+            print("<li><a href=\"" + kakuyomu_url + "/works/" + work_id
+                  + "/episodes/" + episode_id + "\">" + episode_title
+                  + "</a> [" + episode_update_date + "] <br></li>", file=f)
     print("</ul>", file=f)
 
 
@@ -108,7 +112,9 @@ def get_title_element(ep_key, f):
     episode_update_isodate = (j["props"]["pageProps"]["__APOLLO_STATE__"][ep_key]["publishedAt"])
     episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
 
-    print("<li><a href=\"" + kakuyomu_url + "/works/" + work_id + "/episodes/" + episode_id + "\">" + episode_title + "</a> [" + episode_update_date + "] <br></li>", file=f)
+    print("<li><a href=\"" + kakuyomu_url + "/works/" + work_id
+          + "/episodes/" + episode_id + "\">" + episode_title
+          + "</a> [" + episode_update_date + "] <br></li>", file=f)
 
 
 # def get_chapter_info():

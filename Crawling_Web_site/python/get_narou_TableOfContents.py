@@ -1,8 +1,10 @@
-import requests
+# import datetime
 import json
-import datetime
 import sys
+
 from bs4 import BeautifulSoup
+
+import requests
 
 args = sys.argv
 
@@ -131,7 +133,8 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
                 chapter_json_name = '{}_{}'.format("Chapters", chp_num)
                 # Chapterの存在するNovelの場合、章分割のために ep_list とchapter_jsonを再度初期化。
                 ep_list = []
-                chapter_json = {"__typename": "Chapter", "chp_num": chp_num, "ChapterName": key_cp_title, "Episode": ep_list}
+                chapter_json = {"__typename": "Chapter", "chp_num": chp_num,
+                                "ChapterName": key_cp_title, "Episode": ep_list}
                 # print('Chapter {} {}'.format(chp_num,key_cp_title))
                 # print( chapter_json )
                 chp_num = chp_num+1
@@ -143,7 +146,8 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
                 novel_sub_url = (novel_url + key_link.get("href"))
                 novel_sub_title = key_link.text.strip()
                 novel_sub_update = key_update_date.text.strip().replace("\n", "")
-                ep_list.append({"__typename": "Episode", "ep_num": ep_num, "url": novel_sub_url, "title": novel_sub_title, "publishedAt": novel_sub_update})
+                ep_list.append({"__typename": "Episode", "ep_num": ep_num, "url": novel_sub_url,
+                                "title": novel_sub_title, "publishedAt": novel_sub_update})
                 chapter_json["Episode"] = ep_list
                 contents_json[chapter_json_name] = chapter_json
                 # print ('episode {} : {}, {}, {} '.format(ep_num, novel_sub_title, novel_sub_url,novel_sub_update))
