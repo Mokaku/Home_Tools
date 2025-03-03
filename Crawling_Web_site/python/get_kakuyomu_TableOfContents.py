@@ -3,6 +3,7 @@ import json
 import datetime
 import sys
 from bs4 import BeautifulSoup
+import os
 
 args = sys.argv
 
@@ -26,6 +27,8 @@ html = requests.get(load_url)
 soup = BeautifulSoup(html.content, "html.parser")
 
 filename = '../../html/' + prefix + novel_id + '.html'
+## home_dir = '/home/htobe'
+home_dir = os.environ['HOME']
 
 ###################################################
 # bt4 module 使い方メモ
@@ -41,7 +44,7 @@ filename = '../../html/' + prefix + novel_id + '.html'
 ###################################################
 
 if soup.find(id="__NEXT_DATA__"):
-    print("..... Data Load OK")
+    print("\n..... Data Load OK")
     j = json.loads(soup.find(id="__NEXT_DATA__").text)  # type: ignore
 
     rec01 = (j["props"]["pageProps"]["__APOLLO_STATE__"])
@@ -49,7 +52,7 @@ if soup.find(id="__NEXT_DATA__"):
     work_title: str = ""
 
 else:
-    print("############\nNovel ID:", novel_id, "\nThis Novel Contents does not Exist\n############")
+    print("\n############\nNovel ID:", novel_id, "\nThis Novel Contents does not Exist\n############")
     sys.exit(0)
 
 
@@ -173,7 +176,9 @@ def main():
     ###################################################
 
     info_text = '{}: {}'
+    bookmark_html = '<li><a href="file://{2}/Documents/Test/Novels/html/kakuyomu_{0}.html">{1} (id:{0})</a>'
     print(info_text.format(work_id, novel_info.only_get_work_title()))
+    print(bookmark_html.format(work_id, novel_info.only_get_work_title(), home_dir))
 
     with open(filename, 'w') as f:
 

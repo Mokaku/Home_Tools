@@ -4,8 +4,8 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-beautifulsoup4 = "*"
 datetime = "*"
+beautifulsoup4 = "*"
 requests = "*"
 
 [dev-packages]
@@ -15,4 +15,4 @@ flake8-import-order = "*"
 ruff = "*"
 
 [requires]
-python_version = "3.9"
+python_version = "3.11"
