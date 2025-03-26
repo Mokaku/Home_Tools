@@ -18,7 +18,9 @@ cat ${list_dir}${list_file} |\
 			if [ ${work_get_flg} == 1 ]; then
 				python get_kakuyomu_TableOfContents.py ${work_id};
 			else
+				echo ""
 				echo "### PASS: ${work_ref}"
+
 			fi
 
 		done
