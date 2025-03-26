@@ -79,6 +79,16 @@ class GetBaseNobelInfo():
                     # print("WORK_KEY: ", work_key)
                     return (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["author"]["__ref"])
 
+    def only_get_work_last_update(self):
+        for key in self.__rec01:
+            if (key.startswith('Work:')):
+                if (self.__work_id == (j["props"]["pageProps"]["__APOLLO_STATE__"][key]["id"])):
+                    # print("WORK_KEY: ", work_key)
+                    last_episode_published_at =(j["props"]["pageProps"]["__APOLLO_STATE__"][key]["lastEpisodePublishedAt"]) 
+                    last_update_date = datetime.datetime.fromisoformat(last_episode_published_at).strftime('%Y年%m月%d日 %H:%M')
+                    return (last_update_date)
+
+
     def only_get_auther_activity_name(self):
         for key in self.__rec01:
             if (self.__auther_id == key):
@@ -181,10 +191,10 @@ def main():
     """
     ###################################################
 
-    info_text = '{}: {}'
-    bookmark_html = '<li><a href="file://{2}/Documents/Test/Novels/html/kakuyomu_{0}.html">{1} (id:{0})</a>'
+    info_text = '## For Novel DB:\n{}, 1, {}'
+    bookmark_html = '## For Bookmark File:\n<li><a href="file://{2}/Documents/Test/Novels/html/kakuyomu_{0}.html">{1} (id:{0})</a>({3})'
     print(info_text.format(work_id, novel_info.only_get_work_title()))
-    print(bookmark_html.format(work_id, novel_info.only_get_work_title(), home_dir))
+    print(bookmark_html.format(work_id, novel_info.only_get_work_title(), home_dir, novel_info.only_get_auther_activity_name()))
 
     with open(filename, 'w') as f:
 
@@ -193,7 +203,8 @@ def main():
         # get_auther_info(auther_id)
 
         print("<h2>", novel_info.only_get_work_title(), " (id:", work_id, ") </h2>", file=f)
-        print("<h2> by <a href=\"", auther_url, "\">", novel_info.only_get_auther_activity_name(), "</a> </h2>", file=f)
+        print("<h2> by <a href=\"", auther_url, "\">", novel_info.only_get_auther_activity_name(), "</a>", file=f)
+        print(" ( 最終更新日：", novel_info.only_get_work_last_update(), ") </h2>", file=f)
 
         # test チャプター有り無し判定により出力内容を変更する
         if (len(j["props"]["pageProps"]["__APOLLO_STATE__"]["Work:" + work_id]["tableOfContents"]) > 1):
