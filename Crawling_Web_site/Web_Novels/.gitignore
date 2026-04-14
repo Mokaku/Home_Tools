@@ -22,3 +22,4 @@ debug_*.*
 # Code Backup Files #
 ######################
 /html/*
+!.gitkeep
