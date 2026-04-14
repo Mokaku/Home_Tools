@@ -13,7 +13,7 @@ cat ${list_dir}${list_file} |\
 			# echo ${ncode_id}
 			# echo ${ncode_ref}
 			# echo "GET_FLAG: ${ncode_get_flg}"
-			if [ ${ncode_get_flg} == 1 ]; then
+			if [ "${ncode_get_flg}" == 1 ]; then
 				python get_narou_TableOfContents.py ${ncode_id};
 			else
 				echo "PASS: ${ncode_ref}"
