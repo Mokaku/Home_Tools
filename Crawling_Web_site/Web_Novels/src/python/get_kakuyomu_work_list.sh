@@ -1,7 +1,7 @@
 #!/bin/bash
 
 list_dir="../../novel_database/"
-list_file="all_novel_id.list"
+list_file="kakuyomu_all_novel_id.list"
 
 cat ${list_dir}${list_file} |\
 	while read line;
@@ -14,9 +14,11 @@ cat ${list_dir}${list_file} |\
 			# echo "LINE: ${line}"
 			# echo "ID: ${work_id}"
 			# echo "Reference: ${work_ref}"
-			# echo "GET_FLAG: ${work_get_flg}"
-			if [ ${work_get_flg} == 1 ]; then
+			echo "### ${work_id}##################"
+			echo "GET_FLAG: ${work_get_flg}"
+			if [ ${work_get_flg} = 1 ]; then
 				python get_kakuyomu_TableOfContents.py ${work_id};
+				## python Debug_get_kakuyomu_TableOfContents_00.py ${work_id};
 			else
 				echo ""
 				echo "### PASS: ${work_ref}"

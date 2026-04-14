@@ -7,6 +7,9 @@ name = "pypi"
 datetime = "*"
 beautifulsoup4 = "*"
 requests = "*"
+kakuyomu-cli = "*"
+pydantic = "<2.12"
+kakuyomub = "*"
 
 [dev-packages]
 flake8 = "*"

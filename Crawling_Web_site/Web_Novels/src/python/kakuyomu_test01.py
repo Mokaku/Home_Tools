@@ -5,22 +5,28 @@ from bs4 import BeautifulSoup
 
 args = sys.argv
 
-# print(args[1])
-# print(len(args))
+print(args[1])
+print(len(args))
 
-# if 2 <= len(args):
-# 	if args[1].isdigit():
-# 		novel_id = args[1]
-# 	else:
-# 		print('Argument is not digit')
-# else:
-# 	print('Arguments are too short')
+if 2 <= len(args):
+	if args[1].isdigit():
+		novel_id = args[1]
+	else:
+		print('Argument is not digit')
+else:
+	print('Arguments are too short')
 
 kakuyomu_url = "https://kakuyomu.jp"
 load_url = kakuyomu_url + "/works/" + novel_id
-# html = requests.get(load_url)
 
-# soup = BeautifulSoup(html.content, "html.parser")
+# 2026年現在のブラウザに見せかけるためのヘッダー
+headers = {
+"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+}
+
+html = requests.get(load_url, headers=headers)
+
+soup = BeautifulSoup(html.content, "html.parser")
 ###################################################
 ## bt4 module 使い方メモ
 ###################################################
@@ -37,7 +43,7 @@ load_url = kakuyomu_url + "/works/" + novel_id
 
 # filename = '../../novel_database/' + novel_id + '_test04.json'
 
-# s = (soup.find(id="__NEXT_DATA__").text)
+s = (soup.find(id="__NEXT_DATA__").text)
 # j = json.loads(s)
 
 # rec01 = (j["props"]["pageProps"]["__APOLLO_STATE__"])
@@ -66,7 +72,7 @@ load_url = kakuyomu_url + "/works/" + novel_id
 ###################################################
 
 def main():
-	print("test")
+	print(s)
 
 
 main()

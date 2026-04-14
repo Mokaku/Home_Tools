@@ -1,0 +1,18 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+requests = "*"
+cmd2-ansi = "*"
+kakuyomub = "*"
+cmd2 = "<3.0.0"
+pydantic = "<2.12"
+kakuyomu-cli = "*"
+novel-dl = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.13"
