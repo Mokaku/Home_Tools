@@ -121,7 +121,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
     ep_num = 1
     chp_num = 1
     page_num = int(page_num) + 1
-    contents_json = {"__typename": "Story", "id": novel_id, "serieis": novel_series_name, "title": novel_title, "AutherName": novel_auther}
+    contents_json = {"__typename": "Story", "id": novel_id, "series": novel_series_name, "title": novel_title, "AuthorName": novel_auther}
 
     # Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
     chapter_json_name = "Chapters_1"
@@ -388,6 +388,9 @@ def main():
     # 3. 更新有無に応じたHTML/JSONの出力
     if is_updated:
         print(f"【更新あり】コンテンツに更新が検出されました (最終更新: {latest_date})。HTMLとJSONを出力します。")
+
+        os.makedirs(os.path.dirname(json_filename), exist_ok=True)
+        os.makedirs(os.path.dirname(html_filename), exist_ok=True)
         
         with open(json_filename, 'w', encoding='utf-8') as f:
             print(json.dumps(list_dict, indent=4, ensure_ascii=False), file=f)
