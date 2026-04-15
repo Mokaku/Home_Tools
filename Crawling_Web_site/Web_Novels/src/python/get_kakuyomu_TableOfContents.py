@@ -3,25 +3,54 @@ import json
 import os
 import sys
 import re  # 追加: 日付の正規表現チェック用
+import sqlite3
+import argparse
 
 from bs4 import BeautifulSoup
-
 import requests
 
-args = sys.argv
+# ==========================================
+# === 引数と管理形式の設定 ===
+# ==========================================
+# コマンドライン引数の設定
+parser = argparse.ArgumentParser(description="カクヨム!の目次を取得・更新します")
+parser.add_argument("novel_id", type=str, help="取得する小説のID（例: 16817330667341551839）")
+parser.add_argument("--mode", type=str, choices=["sqlite", "csv"], default="sqlite", 
+                    help="管理形式の指定 (デフォルト: sqlite)")
+args = parser.parse_args()
+
+## args = sys.argv
 
 # print(args[1])
 # print(len(args))
 
-if 2 <= len(args):
-    if args[1].isdigit():
-        novel_id = args[1]
-    else:
-        print('Argument is not digit')
-        sys.exit(1)  # 修正: エラー時は後続処理を止め、安全に終了させる
-else:
-    print('Arguments are too short')
-    sys.exit(1)  # 修正: エラー時は後続処理を止め、安全に終了させる
+## if 2 <= len(args):
+##     if args[1].isdigit():
+##         novel_id = args[1]
+##     else:
+##         print('Argument is not digit')
+##         sys.exit(1)  # 修正: エラー時は後続処理を止め、安全に終了させる
+## else:
+##     print('Arguments are too short')
+##     sys.exit(1)  # 修正: エラー時は後続処理を止め、安全に終了させる
+
+# ==========================================
+# === 管理形式の設定（ここでモードを切り替えます）===
+# ==========================================
+# 引数から値を取得
+novel_id = args.novel_id
+MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
+SITE_TYPE = "kakuyomu"         # DB用のサイト識別子
+
+# ファイルパスの定義
+LIST_DIR = "../../novel_database/"
+CSV_FILE_NAME = "narou_all_novel_id.list"
+DB_FILE_NAME = "sampl_database_01.db"
+
+CSV_FILE_PATH = os.path.join(LIST_DIR, CSV_FILE_NAME)
+DB_FILE_PATH = os.path.join(LIST_DIR, DB_FILE_NAME)
+# ==========================================
+
 
 kakuyomu_url = "https://kakuyomu.jp"
 kakuyomu_user_page_url = "https://kakuyomu.jp/users"
@@ -195,56 +224,63 @@ def get_chapter_title(f):
                 print("</ul>", file=f)
             #     print (chapter_id, chapter_title)
 
+# ==========================================
+# データベース / CSV 管理用関数群
+# ==========================================
 
-def main():
-
-    novel_info = GetBaseNobelInfo(work_id, rec01)
-
-    ## # --- デバッグ用: 現在のJSON構造をファイルに書き出して確認する ---
-    ## with open("debug_apollo_state.json", "w", encoding="utf-8") as f_debug:
-    ##     json.dump(rec01, f_debug, indent=4, ensure_ascii=False)
-    ## print("デバッグ用のJSONを debug_apollo_state.json に出力しました。新しいキー構成を確認してください。")
-    ## # -------------------------------------------------------------
-
-    auther_url = f"{kakuyomu_user_page_url}/{novel_info.only_get_auther_name()}"
-    # auther_url = tmp_url.strip(" ")
-
-    ###################################################
-    # 出力用　HTML HEADER
-
-    # 修正: f-string に統一
-    html_head = f"""
-    <!DOCTYPE html>
-    <html lang=ja>
-    <html><head><title>{novel_info.only_get_work_title()}(id:{work_id})</title></head>
-    <body>
-    <h1>目次</h1>
-    """.strip()
-
-    ###################################################
-    # 出力用　HTML FOOTER
-
-    html_footer = """
-    </body>
-    </html>
+def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
     """
-    ###################################################
+    SQLiteを用いて更新日時を管理し、更新の有無を返す関数
+    """
+    is_updated = True
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    info_text = '## For Novel DB:\n{}, 1, {}'
-    bookmark_html = '## For Bookmark File:\n<li><a href="file://{2}/Documents/Test/Novels/html/kakuyomu_{0}.html">{1} (id:{0})</a>({3})'
-    print(info_text.format(work_id, novel_info.only_get_work_title()))
-    print(bookmark_html.format(work_id, novel_info.only_get_work_title(), home_dir, novel_info.only_get_auther_activity_name()))
+    # DBに接続（ファイルがない場合は自動作成されます）
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
 
-    # ---------------------------------------------------------
-    # 追加: 更新判定と kakuyomu_all_novel_id.list の更新処理
-    # ---------------------------------------------------------
-    latest_date = novel_info.only_get_work_last_update()
+    # テーブル作成（初回のみ実行される）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS novels (
+            novel_id TEXT PRIMARY KEY,
+            site_type TEXT,
+            flag INTEGER,
+            title TEXT,
+            last_update TEXT
+        )
+    ''')
 
-    list_dir = "../../novel_database/"
-    list_file = "kakuyomu_all_novel_id.list"  # 必要に応じて変更してください
-    list_path = os.path.join(list_dir, list_file)
-    
-    is_updated = True # 初期値は更新あり
+    # 現在登録されているデータを検索
+    cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (novel_id,))
+    row = cursor.fetchone()
+
+    if row:
+        db_last_update = row[0]
+        # 更新日が同じならスキップ判定
+        if latest_date and db_last_update == latest_date:
+            is_updated = False
+        else:
+            # 日付が変わっていればレコードを更新
+            cursor.execute('UPDATE novels SET title = ?, last_update = ? WHERE novel_id = ?', 
+                           (title, latest_date, novel_id))
+    else:
+        # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
+        cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
+                       (novel_id, site_type, 1, title, latest_date))
+
+    # 変更を保存して接続を閉じる
+    conn.commit()
+    conn.close()
+
+    return is_updated
+
+
+def manage_with_csv(list_path, novel_id, latest_date):
+    """
+    CSV(.list)形式を用いて更新日時を管理し、更新の有無を返す関数
+    （これまでの処理をそのまま関数化したものです）
+    """
+    is_updated = True
 
     if os.path.exists(list_path):
         with open(list_path, "r", encoding="utf-8") as f:
@@ -252,18 +288,15 @@ def main():
             
         new_lines = []
         for line in lines:
-            if line.startswith(f"{work_id},"):
-                # "id, flag, title[, date]" という構成を前提にパース
+            if line.startswith(f"{novel_id},"):
                 parts = line.split(',', 2)
                 if len(parts) == 3:
-                    # すでに同じ最新日時が記録されている場合は更新スキップ
                     if latest_date and (latest_date in parts[2]):
                         is_updated = False
                         new_lines.append(line)
                     else:
-                        # 既存の日付を正規表現で探して置換するか、追記する
-                        # カクヨムの日付フォーマット (YYYY年MM月DD日) を想定
                         sub_parts = parts[2].rsplit(',', 1)
+                        # カクヨムの日付フォーマットに合わせた正規表現
                         if len(sub_parts) == 2 and re.search(r'\d{4}年\d{2}月\d{2}日', sub_parts[1]):
                             new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
                         else:
@@ -275,57 +308,93 @@ def main():
             else:
                 new_lines.append(line)
                 
-        # 更新が確認された場合のみ、リストファイルを上書き更新
         if is_updated:
-            os.makedirs(list_dir, exist_ok=True)
+            os.makedirs(os.path.dirname(list_path), exist_ok=True)
             with open(list_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
     else:
         print(f"警告: リストファイルが見つかりません ({list_path})")
 
-    # 3. 更新有無に応じたHTMLの出力処理
+    return is_updated
+
+# ==========================================
+
+
+def main():
+
+    # 1. 取得したデータから作品情報と最新の更新日時を抽出
+    novel_info = GetBaseNobelInfo(work_id, rec01)
+
+    print("--------------------------------")
+    novel_title = novel_info.only_get_work_title()
+    novel_auther = novel_info.only_get_auther_activity_name()
+    latest_date = novel_info.only_get_work_last_update()
+    
+    print("タイトル:", novel_title)
+    print("作者:", novel_auther)
+    print("#################")
+
+    # 2. 設定されたモードに応じて、DBまたはCSVの更新関数を呼び出す
+    if MANAGEMENT_MODE == "sqlite":
+        print(f"[SQLiteモードで実行中] DB: {DB_FILE_NAME}")
+        is_updated = manage_with_sqlite(DB_FILE_PATH, work_id, SITE_TYPE, novel_title, latest_date)
+    elif MANAGEMENT_MODE == "csv":
+        print(f"[CSVモードで実行中] List: {CSV_FILE_NAME}")
+        is_updated = manage_with_csv(CSV_FILE_PATH, work_id, latest_date)
+    else:
+        print("エラー: MANAGEMENT_MODE の設定が不正です。")
+        sys.exit(1)
+
+
+    # 3. 更新有無に応じたHTMLの出力
     if is_updated:
         print(f"【更新あり】コンテンツに更新が検出されました (最終更新: {latest_date})。HTMLを出力します。")
-        with open(filename, 'w', encoding='utf-8') as f:
-            print(html_head, file=f)
-            # get_work_info()
-            # get_auther_info(auther_id)
 
-            # 修正: f-stringによる文字列結合。HTMLタグの構造が分かりやすくなります。
-            print(f"<h2> {novel_info.only_get_work_title()} (id:{work_id}) </h2>", file=f)
-            print(f"<h2> by <a href=\"{auther_url}\">{novel_info.only_get_auther_activity_name()}</a>", file=f)
+        # HTML出力用の変数準備
+        auther_url = f"{kakuyomu_user_page_url}/{novel_info.only_get_auther_name()}"
+        html_head = f"""
+        <!DOCTYPE html>
+        <html lang=ja>
+        <html><head><title>{novel_title}(id:{work_id})</title></head>
+        <body>
+        <h1>目次</h1>
+        """.strip()
+
+        html_footer = """
+        </body>
+        </html>
+        """
+
+        # ブックマーク・DB用情報の出力（既存の動作を維持）
+        info_text = '## For Novel DB:\n{}, 1, {}'
+        bookmark_html = '## For Bookmark File:\n<li><a href="file://{2}/Documents/Test/Novels/html/kakuyomu_{0}.html">{1} (id:{0})</a>({3})'
+        print(info_text.format(work_id, novel_title))
+        print(bookmark_html.format(work_id, novel_title, home_dir, novel_auther))
+
+        # 出力先ディレクトリが存在しなければ自動作成する
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        with open(filename, 'w', encoding='utf-8') as f:
+
+            print(html_head, file=f)
+            print(f"<h2> {novel_title} (id:{work_id}) </h2>", file=f)
+            print(f"<h2> by <a href=\"{auther_url}\">{novel_auther}</a>", file=f)
             print(f" ( 最終更新日：{latest_date} ) </h2>", file=f)
 
-            # test チャプター有り無し判定により出力内容を変更する
-            # 「Chapter:」から始まるキー（実際のチャプター情報）が存在するかで判定する
+            # チャプター有り無し判定により出力内容を変更する
             has_chapter = any(k.startswith("Chapter:") for k in rec01)
 
             if has_chapter:
-                # print("チャプターあり")
                 get_chapter_title(f)
             else:
-                # print("チャプターなし")
                 get_episode_info(f)
 
-            # test チャプター有り無し判定により出力内容を変更する
-            ## 過去の実装方法を残しておく
-            ## if (len(j["props"]["pageProps"]["__APOLLO_STATE__"]["Work:" + work_id]["tableOfContents"]) > 1):
-            ##     # print("チャープターあり")
-            ##     get_chapter_title(f)
-            ## else:
-            ##     # print("チャープターなし")
-            ##     get_episode_info(f)
-
-            # get_chapter_info()
             print(html_footer, file=f)
 
-            # f.close()  <-- 修正: with文のスコープを抜けると自動でクローズされるため削除（コメントとして残しています）
-
-            # with open(filename) as f:
-            #     contents = f.read()
-            #     print(contents)  # hello
     else:
         print(f"【更新なし】コンテンツに変更はありませんでした (最終更新: {latest_date})。HTMLの出力処理をスキップします。")
 
 
 main()
+
+

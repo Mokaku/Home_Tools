@@ -3,25 +3,51 @@ import json
 import sys
 import os
 import re
+import sqlite3
+import argparse
 
 from bs4 import BeautifulSoup
-
 import requests
 
-args = sys.argv
+# ==========================================
+# === 引数と管理形式の設定 ===
+# ==========================================
+# コマンドライン引数の設定
+parser = argparse.ArgumentParser(description="なろう小説の目次を取得・更新します")
+parser.add_argument("novel_id", type=str, help="取得する小説のID（例: n2732lu）")
+parser.add_argument("--mode", type=str, choices=["sqlite", "csv"], default="sqlite", 
+                    help="管理形式の指定 (デフォルト: sqlite)")
+args = parser.parse_args()
 
+
+
+## args = sys.argv
 # print(args[1])
 # print(len(args))
 
-if 2 <= len(args):
-    novel_id = args[1]
-    # if args[1].isdigit():
-    #     novel_id = args[1]
-    # else:
-    #     print('Argument is not digit')
-else:
-    print('Arguments are too short')
-    sys.exit(1) # 修正: 引数不足時は後続処理を止め、安全に終了させる
+## if 2 <= len(args):
+##     novel_id = args[1]
+## else:
+##     print('Arguments are too short')
+##     sys.exit(1) # 修正: 引数不足時は後続処理を止め、安全に終了させる
+
+# ==========================================
+# === 管理形式の設定（ここでモードを切り替えます）===
+# ==========================================
+# 引数から値を取得
+novel_id = args.novel_id
+
+MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
+SITE_TYPE = "narou"         # DB用のサイト識別子
+
+# ファイルパスの定義
+LIST_DIR = "../../novel_database/"
+CSV_FILE_NAME = "narou_all_novel_id.list"
+DB_FILE_NAME = "sampl_database_01.db"
+
+CSV_FILE_PATH = os.path.join(LIST_DIR, CSV_FILE_NAME)
+DB_FILE_PATH = os.path.join(LIST_DIR, DB_FILE_NAME)
+# ==========================================
 
 source_dir = "../../json_source"
 source_file = "daysneo_da59da23660b4fa346e5717aed10e147.html"
@@ -106,7 +132,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
     ep_num = 1
     chp_num = 1
     page_num = int(page_num) + 1
-    contents_json = {"__typename": "Story", "id": novel_id, "serieis": novel_series_name, "title": novel_title, "AutherName": novel_auther}
+    contents_json = {"__typename": "Story", "id": novel_id, "series": novel_series_name, "title": novel_title, "AuthorName": novel_auther}
 
     # Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
     chapter_json_name = "Chapters_1"
@@ -194,7 +220,7 @@ def create_html_file(list_dict, f_html):
 
     # 修正: f-stringの適用
     print(f"<h2> {list_dict['title']} (id: {list_dict['id']}) </h2>", file=f_html)
-    print(f"<h2> by <a href=\"{load_url}\">{list_dict['AutherName']}</a> </h2>", file=f_html)
+    print(f"<h2> by <a href=\"{load_url}\">{list_dict['AuthorName']}</a> </h2>", file=f_html)
 
     for chap_list_key in list_dict:
         if "Chapters_" in chap_list_key:
@@ -214,9 +240,104 @@ def create_html_file(list_dict, f_html):
     print(html_footer, file=f_html)
 
 
+# ==========================================
+# データベース / CSV 管理用関数群
+# ==========================================
+
+def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
+    """
+    SQLiteを用いて更新日時を管理し、更新の有無を返す関数
+    """
+    is_updated = True
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    # DBに接続（ファイルがない場合は自動作成されます）
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # テーブル作成（初回のみ実行される）
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS novels (
+            novel_id TEXT PRIMARY KEY,
+            site_type TEXT,
+            flag INTEGER,
+            title TEXT,
+            last_update TEXT
+        )
+    ''')
+
+    # 現在登録されているデータを検索
+    cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (novel_id,))
+    row = cursor.fetchone()
+
+    if row:
+        db_last_update = row[0]
+        # 更新日が同じならスキップ判定
+        if latest_date and db_last_update == latest_date:
+            is_updated = False
+        else:
+            # 日付が変わっていればレコードを更新
+            cursor.execute('UPDATE novels SET title = ?, last_update = ? WHERE novel_id = ?', 
+                           (title, latest_date, novel_id))
+    else:
+        # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
+        cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
+                       (novel_id, site_type, 1, title, latest_date))
+
+    # 変更を保存して接続を閉じる
+    conn.commit()
+    conn.close()
+
+    return is_updated
+
+
+def manage_with_csv(list_path, novel_id, latest_date):
+    """
+    CSV(.list)形式を用いて更新日時を管理し、更新の有無を返す関数
+    （これまでの処理をそのまま関数化したものです）
+    """
+    is_updated = True
+
+    if os.path.exists(list_path):
+        with open(list_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+            
+        new_lines = []
+        for line in lines:
+            if line.startswith(f"{novel_id},"):
+                parts = line.split(',', 2)
+                if len(parts) == 3:
+                    if latest_date and (latest_date in parts[2]):
+                        is_updated = False
+                        new_lines.append(line)
+                    else:
+                        sub_parts = parts[2].rsplit(',', 1)
+                        if len(sub_parts) == 2 and re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]):
+                            new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
+                        else:
+                            clean_title = parts[2].rstrip('\n')
+                            new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
+                        new_lines.append(new_line)
+                else:
+                    new_lines.append(line)
+            else:
+                new_lines.append(line)
+                
+        if is_updated:
+            os.makedirs(os.path.dirname(list_path), exist_ok=True)
+            with open(list_path, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+    else:
+        print(f"警告: リストファイルが見つかりません ({list_path})")
+
+    return is_updated
+
+# ==========================================
+
 class GetPagerContents():
     def __init__(self, soup):
         self.__soup = soup
+
 
 
 def main():
@@ -263,55 +384,24 @@ def main():
                 # 最新のエピソードの更新日を保持（一番最後が最新）
                 latest_date = ep_arry["Episode"][-1]["publishedAt"]
 
-    # 2. リストファイルを読み込み、更新チェック
-    list_dir = "../../novel_database/"
-    list_file = "narou_all_novel_id.list"
-    list_path = os.path.join(list_dir, list_file)
-    
-    is_updated = True # 初期値は更新あり
-
-    if os.path.exists(list_path):
-        with open(list_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            
-        new_lines = []
-        for line in lines:
-            if line.startswith(f"{novel_id},"):
-                # "id, flag, title[, date]" という構成を前提にパース
-                parts = line.split(',', 2)
-                if len(parts) == 3:
-                    # すでに同じ最新日時が記録されている場合は更新スキップ
-                    if latest_date and (latest_date in parts[2]):
-                        is_updated = False
-                        new_lines.append(line)
-                    else:
-                        # 既存の日付を正規表現で探して置換するか、追記する
-                        sub_parts = parts[2].rsplit(',', 1)
-                        if len(sub_parts) == 2 and re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]):
-                            # 既に日付カラムがある場合は置換
-                            new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
-                        else:
-                            # 初回追記：末尾の改行を削って、日付カラムを追加
-                            clean_title = parts[2].rstrip('\n')
-                            new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
-                        new_lines.append(new_line)
-                else:
-                    new_lines.append(line)
-            else:
-                new_lines.append(line)
-                
-        # 更新が確認された場合のみ、リストファイルを上書き更新
-        if is_updated:
-            os.makedirs(list_dir, exist_ok=True)
-            with open(list_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
+    # 2. 設定されたモードに応じて、DBまたはCSVの更新関数を呼び出す
+    if MANAGEMENT_MODE == "sqlite":
+        print(f"[SQLiteモードで実行中] DB: {DB_FILE_NAME}")
+        is_updated = manage_with_sqlite(DB_FILE_PATH, novel_id, SITE_TYPE, novel_title, latest_date)
+    elif MANAGEMENT_MODE == "csv":
+        print(f"[CSVモードで実行中] List: {CSV_FILE_NAME}")
+        is_updated = manage_with_csv(CSV_FILE_PATH, novel_id, latest_date)
     else:
-        # リストファイルがない場合は警告を出しつつ、出力自体は行う
-        print(f"警告: リストファイルが見つかりません ({list_path})")
+        print("エラー: MANAGEMENT_MODE の設定が不正です。")
+        sys.exit(1)
+
 
     # 3. 更新有無に応じたHTML/JSONの出力
     if is_updated:
         print(f"【更新あり】コンテンツに更新が検出されました (最終更新: {latest_date})。HTMLとJSONを出力します。")
+
+        os.makedirs(os.path.dirname(json_filename), exist_ok=True)
+        os.makedirs(os.path.dirname(html_filename), exist_ok=True)
         
         with open(json_filename, 'w', encoding='utf-8') as f:
             print(json.dumps(list_dict, indent=4, ensure_ascii=False), file=f)
