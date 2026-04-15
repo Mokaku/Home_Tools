@@ -3,29 +3,40 @@ import json
 import sys
 import os
 import re
+import sqlite3
+import argparse
 
 from bs4 import BeautifulSoup
-
 import requests
 
-args = sys.argv
+# ==========================================
+# === 引数と管理形式の設定 ===
+# ==========================================
+# コマンドライン引数の設定
+parser = argparse.ArgumentParser(description="なろう小説の目次を取得・更新します")
+parser.add_argument("novel_id", type=str, help="取得する小説のID（例: n2732lu）")
+parser.add_argument("--mode", type=str, choices=["sqlite", "csv"], default="sqlite", 
+                    help="管理形式の指定 (デフォルト: sqlite)")
+args = parser.parse_args()
 
+
+
+## args = sys.argv
 # print(args[1])
 # print(len(args))
 
-if 2 <= len(args):
-    novel_id = args[1]
-    # if args[1].isdigit():
-    #     novel_id = args[1]
-    # else:
-    #     print('Argument is not digit')
-else:
-    print('Arguments are too short')
-    sys.exit(1) # 修正: 引数不足時は後続処理を止め、安全に終了させる
+## if 2 <= len(args):
+##     novel_id = args[1]
+## else:
+##     print('Arguments are too short')
+##     sys.exit(1) # 修正: 引数不足時は後続処理を止め、安全に終了させる
 
 # ==========================================
 # === 管理形式の設定（ここでモードを切り替えます）===
 # ==========================================
+# 引数から値を取得
+novel_id = args.novel_id
+
 MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
 SITE_TYPE = "narou"         # DB用のサイト識別子
 
@@ -209,7 +220,7 @@ def create_html_file(list_dict, f_html):
 
     # 修正: f-stringの適用
     print(f"<h2> {list_dict['title']} (id: {list_dict['id']}) </h2>", file=f_html)
-    print(f"<h2> by <a href=\"{load_url}\">{list_dict['AutherName']}</a> </h2>", file=f_html)
+    print(f"<h2> by <a href=\"{load_url}\">{list_dict['AuthorName']}</a> </h2>", file=f_html)
 
     for chap_list_key in list_dict:
         if "Chapters_" in chap_list_key:
