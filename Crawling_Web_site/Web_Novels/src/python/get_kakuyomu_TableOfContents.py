@@ -39,12 +39,12 @@ args = parser.parse_args()
 # ==========================================
 # 引数から値を取得
 novel_id = args.novel_id
-MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
+MANAGEMENT_MODE = args.mode  # ← args.mode に修正します
 SITE_TYPE = "kakuyomu"         # DB用のサイト識別子
 
 # ファイルパスの定義
 LIST_DIR = "../../novel_database/"
-CSV_FILE_NAME = "narou_all_novel_id.list"
+CSV_FILE_NAME = "kakuyomu_all_novel_id.list"
 DB_FILE_NAME = "all_novels_database_01.db"
 
 CSV_FILE_PATH = os.path.join(LIST_DIR, CSV_FILE_NAME)
@@ -282,7 +282,7 @@ def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
     """
     is_updated = True
 
-    if os.path.exists(list_path):
+    if not os.path.exists(list_path):
         print(f"警告: リストファイルが見つかりません ({list_path})")
         return False
 
