@@ -410,9 +410,10 @@ def main():
             has_chapter = any(k.startswith("Chapter:") for k in rec01)
 
             if has_chapter:
-                get_chapter_title(f, rec01_data, target_work_id, base_url)
+                # 実際に main() に存在している変数（実引数）を渡す
+                get_chapter_title(f, rec01, work_id, kakuyomu_url)
             else:
-                get_episode_info(f, rec01_data, target_work_id, base_url)
+                get_episode_info(f, rec01, work_id, kakuyomu_url)
 
             print(html_footer, file=f)
 

@@ -138,7 +138,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther, target
     ep_num = 1
     chp_num = 1
     page_num = int(page_num) + 1
-    contents_json = {"__typename": "Story", "id": novel_id, "series": novel_series_name, "title": novel_title, "AuthorName": novel_auther}
+    contents_json = {"__typename": "Story", "id": target_novel_id, "series": novel_series_name, "title": novel_title, "AuthorName": novel_auther}
 
     # Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
     chapter_json_name = "Chapters_1"
@@ -185,7 +185,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther, target
                 # print ("#2",key_link," / ",key_update_date)
                 # print ("------------")
                 # 修正: f-stringの適用
-                novel_sub_url = f'{novel_url}{key_link.get("href")}'
+                novel_sub_url = f'{base_url}{key_link.get("href")}'
                 novel_sub_title = key_link.text.strip()
                 novel_sub_update = key_update_date.text.strip().replace("\n", "")
                 ep_list.append({"__typename": "Episode", "ep_num": ep_num, "url": novel_sub_url,
@@ -200,7 +200,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther, target
     return contents_json
 
 
-def create_html_file(list_dict, f_html):
+def create_html_file(list_dict, f_html, author_link_url):  # ← 第3引数を追加
 
     ###################################################
     # 出力用　HTML HEADER
@@ -227,7 +227,7 @@ def create_html_file(list_dict, f_html):
 
     # 修正: f-stringの適用
     print(f"<h2> {list_dict['title']} (id: {list_dict['id']}) </h2>", file=f_html)
-    print(f"<h2> by <a href=\"{load_url}\">{list_dict['AuthorName']}</a> </h2>", file=f_html)
+    print(f"<h2> by <a href=\"{author_link_url}\">{list_dict['AuthorName']}</a> </h2>", file=f_html)
 
     for chap_list_key in list_dict:
         if "Chapters_" in chap_list_key:
