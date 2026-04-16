@@ -336,8 +336,8 @@ def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
                             clean_title = parts[2].rstrip('\n')
                             new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
                         new_lines.append(new_line)
-                    else:
-                        new_lines.append(line)
+                else:
+                    new_lines.append(line)
         else:
             new_lines.append(line)
             
