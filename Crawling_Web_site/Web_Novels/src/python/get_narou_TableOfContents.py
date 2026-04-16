@@ -314,6 +314,7 @@ def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
         if line.startswith(f"{target_novel_id},"):
             found = True
             parts = line.split(',', 2)
+
             if is_deleted:
                 print(f"!!! [CSV] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 に更新します。")
                 new_line = f"{parts[0]}, 0, {parts[2]}" if len(parts) >= 3 else line
@@ -331,19 +332,19 @@ def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
                         if len(sub_parts) == 2 and (re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]) or re.search(r'\d{4}年\d{2}月\d{2}日', sub_parts[1])):
                             new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
 
+                        else:
+                            clean_title = parts[2].rstrip('\n')
+                            new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
+                        new_lines.append(new_line)
                     else:
-                        clean_title = parts[2].rstrip('\n')
-                        new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
-                    new_lines.append(new_line)
-                else:
-                    new_lines.append(line)
-            else:
-                new_lines.append(line)
+                        new_lines.append(line)
+        else:
+            new_lines.append(line)
             
-        if found or is_deleted:
-            os.makedirs(os.path.dirname(list_path), exist_ok=True)
-            with open(list_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
+    if found or is_deleted:
+        os.makedirs(os.path.dirname(list_path), exist_ok=True)
+        with open(list_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
 
     return is_updated
 
