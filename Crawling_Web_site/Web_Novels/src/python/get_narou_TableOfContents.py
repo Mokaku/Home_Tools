@@ -99,23 +99,23 @@ html_filename = f'../../html/narou/{prefix}{novel_id}.html'
 ###################################################
 
 
-def get_novel_base_info():
-    novel_series = soup.find(class_="p-novel__series")
+def get_novel_base_info(soup_data):
+    novel_series = soup_data.find(class_="p-novel__series")
     # 修正: Pythonらしい条件分岐でスッキリと記述 (前回不足していた is を追加)
     novel_series_name = "N/A" if novel_series is None else novel_series.text.strip()
 
     # 修正: タイトルタグが存在しない場合(削除時)は "エラー" を返す
-    title_tag = soup.find(class_="p-novel__title")
+    title_tag = soup_data.find(class_="p-novel__title")
     novel_title = title_tag.text.strip() if title_tag else "エラー"
 
     # 修正: 作者タグも同様に安全化
-    author_tag = soup.find(class_="p-novel__author")
+    author_tag = soup_data.find(class_="p-novel__author")
     novel_auther = author_tag.text.strip() if author_tag else "エラー"
 
     return [novel_series_name, novel_title, novel_auther]
 
-def get_page_counts():
-    novel_page_contents = soup.find("div", class_="c-pager")
+def get_page_counts(soup_data):
+    novel_page_contents = soup_data.find("div", class_="c-pager")
     if novel_page_contents is None:
         last_page_num = 1
     else:
@@ -129,10 +129,12 @@ def get_page_counts():
     # print (last_page_line)
     # print("num.--------------------------------")
     # print (last_page_url)
-    return int(last_page_num) # 修正: 数値として返すよう明示的にキャスト
 
+    # 修正: 数値として返すよう明示的にキャスト
+    return int(last_page_num)
 
-def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
+# 引数に target_novel_id, base_url, headers を追加
+def get_all_pages(page_num, novel_series_name, novel_title, novel_auther, target_novel_id, base_url, headers):
     ep_num = 1
     chp_num = 1
     page_num = int(page_num) + 1
@@ -146,11 +148,12 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
     for get_page_num in range(1, page_num):
         # print ("Page:",get_page_num,"#-----")
         # 修正: f-stringの適用
-        _load_url = f"{novel_url}/{novel_id}/?p={get_page_num}"
-        l_html = requests.get(_load_url, headers=ua_headers)
+        _load_url = f"{base_url}/{target_novel_id}/?p={get_page_num}"
+        l_html = requests.get(_load_url, headers=headers)
         l_soup = BeautifulSoup(l_html.content, "html.parser")
-        novel_main_contents = l_soup.find("div", class_="p-eplist")
         # novel_ep_contents_list = (novel_main_contents.find("div" , class_= "p-eplist__subtitle"))
+        novel_main_contents = l_soup.find("div", class_="p-eplist")
+
         
         # 安全策: 万が一中身が取得できなかったらスキップ
         if not novel_main_contents:
@@ -370,11 +373,11 @@ def main():
     print("--------------------------------")
     
     # 修正: 関数を一度だけ呼んで変数に格納（無駄な重複処理を回避）
-    page_num = get_page_counts()
+    page_num = get_page_counts(soup)
     print("All Page Count : ", page_num)
 
     # 修正: 同様に一度だけ呼び出す
-    base_info = get_novel_base_info()
+    base_info = get_novel_base_info(soup)
     novel_series_name = base_info[0]
     novel_title = base_info[1]
     novel_auther = base_info[2]
@@ -403,7 +406,7 @@ def main():
     #########################
     
     # 最も重い処理(HTTPリクエスト群)を1回だけ実行して変数へ格納
-    list_dict = get_all_pages(page_num, novel_series_name, novel_title, novel_auther)
+    list_dict = get_all_pages(page_num, novel_series_name, novel_title, novel_auther, novel_id, novel_url, ua_headers)
 
     # ---------------------------------------------------------
     # 追加: 更新判定と narou_all_novel_id.list の更新処理
@@ -441,7 +444,7 @@ def main():
             print(json.dumps(list_dict, indent=4, ensure_ascii=False), file=f)
 
         with open(html_filename, 'w', encoding='utf-8') as f_html:
-            create_html_file(list_dict, f_html)
+            create_html_file(list_dict, f_html, load_url)
     else:
         print(f"【更新なし】コンテンツに変更はありませんでした (最終更新: {latest_date})。出力処理をスキップします。")
 
