@@ -156,34 +156,34 @@ class GetBaseNobelInfo():
 ##                   + "</a> [" + episode_update_date + "] <br></li>", file=f)
 ##     print("</ul>", file=f)
 
-def get_episode_info(f):
+def get_episode_info(f, rec01_data, target_work_id, base_url):
     print("<ul>", file=f)
     
     # 新しいJSON構造に合わせて "TableOfContentsChapter:" から順番にエピソードを取得
     toc_key = "TableOfContentsChapter:"
-    if toc_key in rec01:
-        episode_list = rec01[toc_key].get("episodeUnions", [])
+    if toc_key in rec01_data:
+        episode_list = rec01_data[toc_key].get("episodeUnions", [])
         for ep in episode_list:
             ep_key = ep["__ref"]  # 例: "Episode:16818093074582369892"
-            get_title_element(ep_key, f)
+            get_title_element(ep_key, f, rec01_data, target_work_id, base_url)
     else:
         # 万が一見つからない場合のフォールバック（旧ロジック）
-        for key in rec01:
+        for key in rec01_data:
             if key.startswith("Episode:"):
-                get_title_element(key, f)
+                get_title_element(key, f, rec01_data, target_work_id, base_url)
                 
     print("</ul>", file=f)
 
 
-def get_title_element(ep_key, f):
+def get_title_element(ep_key, f, rec01_data, target_work_id, base_url):
     # 修正: 冗長だった j["props"]["pageProps"]["__APOLLO_STATE__"] を rec01 の直接参照へ変更
-    episode_title = rec01[ep_key]["title"]
-    episode_id = rec01[ep_key]["id"]
-    episode_update_isodate = rec01[ep_key]["publishedAt"]
+    episode_title = rec01_data[ep_key]["title"]
+    episode_id = rec01_data[ep_key]["id"]
+    episode_update_isodate = rec01_data[ep_key]["publishedAt"]
     episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
 
     # 修正: + 結合を f-string に変更し、HTMLとしての見通しを改善
-    print(f'<li><a href="{kakuyomu_url}/works/{work_id}/episodes/{episode_id}">{episode_title}</a> [{episode_update_date}] <br></li>', file=f)
+    print(f'<li><a href="{base_url}/works/{target_work_id}/episodes/{episode_id}">{episode_title}</a> [{episode_update_date}] <br></li>', file=f)
 
 
 # def get_chapter_info():
@@ -202,16 +202,16 @@ def get_title_element(ep_key, f):
 #             #     print (chapter_id, chapter_title)
 
 
-def get_chapter_title(f):
-    for key in rec01:
+def get_chapter_title(f, rec01_data, target_work_id, base_url):
+    for key in rec01_data:
         if ("Chapter" in key):
             # print(key)
             # print(key.find("Chapter"))
             if (key.find("Chapter") == 0):
-                # 修正: 冗長だった j["props"]["pageProps"]["__APOLLO_STATE__"] を rec01 の直接参照へ変更
-                chapter_title = rec01[key]["title"]
-                chapter_id = rec01[key]["id"]
-                cont_chapter_list = rec01["TableOfContentsChapter:" + chapter_id]["episodeUnions"]
+                # 修正: 冗長だった j["props"]["pageProps"]["__APOLLO_STATE__"] を 引き渡されたrec01_data の直接参照へ変更
+                chapter_title = rec01_data[key]["title"]
+                chapter_id = rec01_data[key]["id"]
+                cont_chapter_list = rec01_data["TableOfContentsChapter:" + chapter_id]["episodeUnions"]
 
                 # 修正: f-string による文字列組み立て
                 print(f"<h3>{chapter_title}</h3>", file=f)
@@ -220,7 +220,7 @@ def get_chapter_title(f):
                     # print (list_key)
                     ep_key = list_key["__ref"]
                     # print (ep_key)
-                    get_title_element(ep_key, f)
+                    get_title_element(ep_key, f, rec01_data, target_work_id, base_url) #次の関数にリレー
                 print("</ul>", file=f)
             #     print (chapter_id, chapter_title)
 
@@ -410,9 +410,9 @@ def main():
             has_chapter = any(k.startswith("Chapter:") for k in rec01)
 
             if has_chapter:
-                get_chapter_title(f)
+                get_chapter_title(f, rec01_data, target_work_id, base_url)
             else:
-                get_episode_info(f)
+                get_episode_info(f, rec01_data, target_work_id, base_url)
 
             print(html_footer, file=f)
 
