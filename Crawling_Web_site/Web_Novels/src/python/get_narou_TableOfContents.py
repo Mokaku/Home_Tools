@@ -103,12 +103,16 @@ def get_novel_base_info():
     novel_series = soup.find(class_="p-novel__series")
     # 修正: Pythonらしい条件分岐でスッキリと記述 (前回不足していた is を追加)
     novel_series_name = "N/A" if novel_series is None else novel_series.text.strip()
-    # print (novel_series_name)
-    novel_title = soup.find(class_="p-novel__title").text.strip()
-    # print (novel_title)
-    novel_auther = soup.find(class_="p-novel__author").text.strip()
-    return [novel_series_name, novel_title, novel_auther]
 
+    # 修正: タイトルタグが存在しない場合(削除時)は "エラー" を返す
+    title_tag = soup.find(class_="p-novel__title")
+    novel_title = title_tag.text.strip() if title_tag else "エラー"
+
+    # 修正: 作者タグも同様に安全化
+    author_tag = soup.find(class_="p-novel__author")
+    novel_auther = author_tag.text.strip() if author_tag else "エラー"
+
+    return [novel_series_name, novel_title, novel_auther]
 
 def get_page_counts():
     novel_page_contents = soup.find("div", class_="c-pager")
