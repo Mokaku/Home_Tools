@@ -37,13 +37,13 @@ args = parser.parse_args()
 # 引数から値を取得
 novel_id = args.novel_id
 
-MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
+MANAGEMENT_MODE = args.mode 
 SITE_TYPE = "narou"         # DB用のサイト識別子
 
 # ファイルパスの定義
 LIST_DIR = "../../novel_database/"
 CSV_FILE_NAME = "narou_all_novel_id.list"
-DB_FILE_NAME = "sampl_database_01.db"
+DB_FILE_NAME = "all_novels_database_01.db"
 
 CSV_FILE_PATH = os.path.join(LIST_DIR, CSV_FILE_NAME)
 DB_FILE_PATH = os.path.join(LIST_DIR, DB_FILE_NAME)
@@ -244,7 +244,7 @@ def create_html_file(list_dict, f_html):
 # データベース / CSV 管理用関数群
 # ==========================================
 
-def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
+def manage_with_sqlite(db_path, target_novel_id, site_type, title, latest_date, is_deleted=False):
     """
     SQLiteを用いて更新日時を管理し、更新の有無を返す関数
     """
@@ -266,69 +266,84 @@ def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
         )
     ''')
 
-    # 現在登録されているデータを検索
-    cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (novel_id,))
-    row = cursor.fetchone()
-
-    if row:
-        db_last_update = row[0]
-        # 更新日が同じならスキップ判定
-        if latest_date and db_last_update == latest_date:
-            is_updated = False
-        else:
-            # 日付が変わっていればレコードを更新
-            cursor.execute('UPDATE novels SET title = ?, last_update = ? WHERE novel_id = ?', 
-                           (title, latest_date, novel_id))
+    if is_deleted:
+        print(f"!!! [SQLITE] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 (停止) に更新します。")
+        cursor.execute('UPDATE novels SET flag = 0 WHERE novel_id = ?', (target_novel_id,))
+        is_updated = False
     else:
-        # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
-        cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
-                       (novel_id, site_type, 1, title, latest_date))
+        # 現在登録されているデータを検索
+        cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (target_novel_id,))
+        row = cursor.fetchone()
+        if row:
+            db_last_update = row[0]
+            # 更新日が同じならスキップ判定
+            if latest_date and db_last_update == latest_date:
+                is_updated = False
+            else:
+                # 日付が変わっていればレコードを更新
+                cursor.execute('UPDATE novels SET title = ?, last_update = ?, flag = 1 WHERE novel_id = ?', 
+                               (title, latest_date, target_novel_id))
+        else:
+            # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
+            cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
+                           (target_novel_id, site_type, 1, title, latest_date))
 
     # 変更を保存して接続を閉じる
     conn.commit()
     conn.close()
-
     return is_updated
 
 
-def manage_with_csv(list_path, novel_id, latest_date):
+def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
     """
     CSV(.list)形式を用いて更新日時を管理し、更新の有無を返す関数
     （これまでの処理をそのまま関数化したものです）
     """
     is_updated = True
 
-    if os.path.exists(list_path):
-        with open(list_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+    if not os.path.exists(list_path):
+        print(f"警告: リストファイルが見つかりません ({list_path})")
+        return False
+
+    with open(list_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
             
-        new_lines = []
-        for line in lines:
-            if line.startswith(f"{novel_id},"):
-                parts = line.split(',', 2)
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.startswith(f"{target_novel_id},"):
+            found = True
+            parts = line.split(',', 2)
+            if is_deleted:
+                print(f"!!! [CSV] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 に更新します。")
+                new_line = f"{parts[0]}, 0, {parts[2]}" if len(parts) >= 3 else line
+                new_lines.append(new_line)
+                is_updated = False
+
+            else:
                 if len(parts) == 3:
                     if latest_date and (latest_date in parts[2]):
                         is_updated = False
                         new_lines.append(line)
                     else:
                         sub_parts = parts[2].rsplit(',', 1)
-                        if len(sub_parts) == 2 and re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]):
+                        # カクヨムとなろうで正規表現が違うため、環境に合わせて柔軟にマッチさせます
+                        if len(sub_parts) == 2 and (re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]) or re.search(r'\d{4}年\d{2}月\d{2}日', sub_parts[1])):
                             new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
-                        else:
-                            clean_title = parts[2].rstrip('\n')
-                            new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
-                        new_lines.append(new_line)
+
+                    else:
+                        clean_title = parts[2].rstrip('\n')
+                        new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
+                    new_lines.append(new_line)
                 else:
                     new_lines.append(line)
             else:
                 new_lines.append(line)
-                
-        if is_updated:
-            os.makedirs(os.path.dirname(list_path), exist_ok=True)
+            
+        if found or is_deleted:
+            os.makedirs(os.path.dirname(list_path), exist_ok=True)
             with open(list_path, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
-    else:
-        print(f"警告: リストファイルが見つかりません ({list_path})")
 
     return is_updated
 
@@ -358,6 +373,20 @@ def main():
     novel_series_name = base_info[0]
     novel_title = base_info[1]
     novel_auther = base_info[2]
+
+    # ★ コンテンツ削除のチェック
+    if novel_title is None or novel_title == "" or "エラー" in novel_title:
+        print(f"\n################################################")
+        print(f"警告: なろうID {novel_id} のタイトルが取得できません。")
+        print(f"削除または非公開の可能性があります。フラグを停止に更新します。")
+        print(f"################################################")
+
+        if MANAGEMENT_MODE == "sqlite":
+            manage_with_sqlite(DB_FILE_PATH, novel_id, SITE_TYPE, None, None, is_deleted=True)
+        elif MANAGEMENT_MODE == "csv":
+            manage_with_csv(CSV_FILE_PATH, novel_id, None, is_deleted=True)
+        
+        sys.exit(0) # 以降のスクレイピング・ファイル出力を中断
     
     print("タイトル:", novel_title)
     print("シリーズ名:", novel_series_name)
