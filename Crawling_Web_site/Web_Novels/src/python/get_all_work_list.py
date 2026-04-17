@@ -8,13 +8,18 @@ import argparse
 # === 設定 ===
 # ==========================================
 LIST_DIR = "../../novel_database/"
-DB_FILE_PATH = os.path.join(LIST_DIR, "sampl_database_01.db")
+DB_FILE_PATH = os.path.join(LIST_DIR, "all_novels_database_01.db")
 
 # CSVモード時に読み込むリストの定義
 CSV_TARGETS = {
-    "narou": os.path.join(LIST_DIR, "narou_all_novel_id.list"),
-    "kakuyomu": os.path.join(LIST_DIR, "kakuyomu_all_novel_id.list")
+    "narou": os.path.join(LIST_DIR, "sample_narou_db_01.csv"),
+    "kakuyomu": os.path.join(LIST_DIR, "sample_kakuyomu_db_01.csv")
 }
+
+## CSV_TARGETS = {
+##     "narou": os.path.join(LIST_DIR, "narou_all_novel_id.list"),
+##     "kakuyomu": os.path.join(LIST_DIR, "kakuyomu_all_novel_id.list")
+## }
 
 # 呼び出すスクリプトの定義
 SCRIPTS = {
@@ -111,6 +116,10 @@ def main():
         subprocess.run([sys.executable, target_script, novel_id, "--mode", run_mode])
 
     print("\n=== 統合一括取得バッチ完了 ===")
+
+    # ▼ 追加: バッチ処理後にブックマークを自動生成する
+    print("\n=== ブックマークの再生成 ===")
+    subprocess.run([sys.executable, "generate_w3m_bookmarks.py"])
 
 
 if __name__ == "__main__":

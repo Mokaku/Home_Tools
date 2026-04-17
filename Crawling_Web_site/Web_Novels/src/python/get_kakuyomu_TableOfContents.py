@@ -39,13 +39,13 @@ args = parser.parse_args()
 # ==========================================
 # 引数から値を取得
 novel_id = args.novel_id
-MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
+MANAGEMENT_MODE = args.mode  # ← args.mode に修正します
 SITE_TYPE = "kakuyomu"         # DB用のサイト識別子
 
 # ファイルパスの定義
 LIST_DIR = "../../novel_database/"
-CSV_FILE_NAME = "narou_all_novel_id.list"
-DB_FILE_NAME = "sampl_database_01.db"
+CSV_FILE_NAME = "kakuyomu_all_novel_id.list"
+DB_FILE_NAME = "all_novels_database_01.db"
 
 CSV_FILE_PATH = os.path.join(LIST_DIR, CSV_FILE_NAME)
 DB_FILE_PATH = os.path.join(LIST_DIR, DB_FILE_NAME)
@@ -156,34 +156,34 @@ class GetBaseNobelInfo():
 ##                   + "</a> [" + episode_update_date + "] <br></li>", file=f)
 ##     print("</ul>", file=f)
 
-def get_episode_info(f):
+def get_episode_info(f, rec01_data, target_work_id, base_url):
     print("<ul>", file=f)
     
     # 新しいJSON構造に合わせて "TableOfContentsChapter:" から順番にエピソードを取得
     toc_key = "TableOfContentsChapter:"
-    if toc_key in rec01:
-        episode_list = rec01[toc_key].get("episodeUnions", [])
+    if toc_key in rec01_data:
+        episode_list = rec01_data[toc_key].get("episodeUnions", [])
         for ep in episode_list:
             ep_key = ep["__ref"]  # 例: "Episode:16818093074582369892"
-            get_title_element(ep_key, f)
+            get_title_element(ep_key, f, rec01_data, target_work_id, base_url)
     else:
         # 万が一見つからない場合のフォールバック（旧ロジック）
-        for key in rec01:
+        for key in rec01_data:
             if key.startswith("Episode:"):
-                get_title_element(key, f)
+                get_title_element(key, f, rec01_data, target_work_id, base_url)
                 
     print("</ul>", file=f)
 
 
-def get_title_element(ep_key, f):
+def get_title_element(ep_key, f, rec01_data, target_work_id, base_url):
     # 修正: 冗長だった j["props"]["pageProps"]["__APOLLO_STATE__"] を rec01 の直接参照へ変更
-    episode_title = rec01[ep_key]["title"]
-    episode_id = rec01[ep_key]["id"]
-    episode_update_isodate = rec01[ep_key]["publishedAt"]
+    episode_title = rec01_data[ep_key]["title"]
+    episode_id = rec01_data[ep_key]["id"]
+    episode_update_isodate = rec01_data[ep_key]["publishedAt"]
     episode_update_date = datetime.datetime.fromisoformat(episode_update_isodate).strftime('%Y年%m月%d日 %H:%M')
 
     # 修正: + 結合を f-string に変更し、HTMLとしての見通しを改善
-    print(f'<li><a href="{kakuyomu_url}/works/{work_id}/episodes/{episode_id}">{episode_title}</a> [{episode_update_date}] <br></li>', file=f)
+    print(f'<li><a href="{base_url}/works/{target_work_id}/episodes/{episode_id}">{episode_title}</a> [{episode_update_date}] <br></li>', file=f)
 
 
 # def get_chapter_info():
@@ -202,16 +202,16 @@ def get_title_element(ep_key, f):
 #             #     print (chapter_id, chapter_title)
 
 
-def get_chapter_title(f):
-    for key in rec01:
+def get_chapter_title(f, rec01_data, target_work_id, base_url):
+    for key in rec01_data:
         if ("Chapter" in key):
             # print(key)
             # print(key.find("Chapter"))
             if (key.find("Chapter") == 0):
-                # 修正: 冗長だった j["props"]["pageProps"]["__APOLLO_STATE__"] を rec01 の直接参照へ変更
-                chapter_title = rec01[key]["title"]
-                chapter_id = rec01[key]["id"]
-                cont_chapter_list = rec01["TableOfContentsChapter:" + chapter_id]["episodeUnions"]
+                # 修正: 冗長だった j["props"]["pageProps"]["__APOLLO_STATE__"] を 引き渡されたrec01_data の直接参照へ変更
+                chapter_title = rec01_data[key]["title"]
+                chapter_id = rec01_data[key]["id"]
+                cont_chapter_list = rec01_data["TableOfContentsChapter:" + chapter_id]["episodeUnions"]
 
                 # 修正: f-string による文字列組み立て
                 print(f"<h3>{chapter_title}</h3>", file=f)
@@ -220,7 +220,7 @@ def get_chapter_title(f):
                     # print (list_key)
                     ep_key = list_key["__ref"]
                     # print (ep_key)
-                    get_title_element(ep_key, f)
+                    get_title_element(ep_key, f, rec01_data, target_work_id, base_url) #次の関数にリレー
                 print("</ul>", file=f)
             #     print (chapter_id, chapter_title)
 
@@ -228,7 +228,7 @@ def get_chapter_title(f):
 # データベース / CSV 管理用関数群
 # ==========================================
 
-def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
+def manage_with_sqlite(db_path, target_novel_id, site_type, title, latest_date, is_deleted=False):
     """
     SQLiteを用いて更新日時を管理し、更新の有無を返す関数
     """
@@ -250,54 +250,65 @@ def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
         )
     ''')
 
-    # 現在登録されているデータを検索
-    cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (novel_id,))
-    row = cursor.fetchone()
+    if is_deleted:
+        # コンテンツ削除時の処理: flag を 0 にして更新なしとする
+        print(f"!!! [SQLITE] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 (停止) に更新します。")
+        cursor.execute('UPDATE novels SET flag = 0 WHERE novel_id = ?', (target_novel_id,))
+        is_updated = False
 
-    if row:
-        db_last_update = row[0]
-        # 更新日が同じならスキップ判定
-        if latest_date and db_last_update == latest_date:
-            is_updated = False
-        else:
-            # 日付が変わっていればレコードを更新
-            cursor.execute('UPDATE novels SET title = ?, last_update = ? WHERE novel_id = ?', 
-                           (title, latest_date, novel_id))
     else:
-        # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
-        cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
-                       (novel_id, site_type, 1, title, latest_date))
+        # 現在登録されているデータを検索
+        cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (target_novel_id,))
+        row = cursor.fetchone()
+        if row:
+            db_last_update = row[0]
+            if latest_date and db_last_update == latest_date:
+                is_updated = False
+            else:
+                cursor.execute('UPDATE novels SET title = ?, last_update = ?, flag = 1 WHERE novel_id = ?', 
+                               (title, latest_date, target_novel_id))
+        else:
+            cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
+                           (target_novel_id, site_type, 1, title, latest_date))
 
-    # 変更を保存して接続を閉じる
     conn.commit()
     conn.close()
-
     return is_updated
 
-
-def manage_with_csv(list_path, novel_id, latest_date):
+def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
     """
     CSV(.list)形式を用いて更新日時を管理し、更新の有無を返す関数
-    （これまでの処理をそのまま関数化したものです）
+    is_deleted=True の場合、対象の flag を 0 に更新する
     """
     is_updated = True
 
-    if os.path.exists(list_path):
-        with open(list_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+    if not os.path.exists(list_path):
+        print(f"警告: リストファイルが見つかりません ({list_path})")
+        return False
+
+    with open(list_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
             
-        new_lines = []
-        for line in lines:
-            if line.startswith(f"{novel_id},"):
-                parts = line.split(',', 2)
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.startswith(f"{target_novel_id},"):
+            found = True
+            parts = line.split(',', 2)
+            if is_deleted:
+                print(f"!!! [CSV] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 に更新します。")
+                new_line = f"{parts[0]}, 0, {parts[2]}" if len(parts) >= 3 else line
+                new_lines.append(new_line)
+                is_updated = False
+            else:
                 if len(parts) == 3:
                     if latest_date and (latest_date in parts[2]):
                         is_updated = False
                         new_lines.append(line)
                     else:
                         sub_parts = parts[2].rsplit(',', 1)
-                        # カクヨムの日付フォーマットに合わせた正規表現
-                        if len(sub_parts) == 2 and re.search(r'\d{4}年\d{2}月\d{2}日', sub_parts[1]):
+                        # カクヨムとなろうで正規表現が違うため、環境に合わせて柔軟にマッチさせます
+                        if len(sub_parts) == 2 and (re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]) or re.search(r'\d{4}年\d{2}月\d{2}日', sub_parts[1])):
                             new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
                         else:
                             clean_title = parts[2].rstrip('\n')
@@ -305,18 +316,16 @@ def manage_with_csv(list_path, novel_id, latest_date):
                         new_lines.append(new_line)
                 else:
                     new_lines.append(line)
-            else:
-                new_lines.append(line)
+        else:
+            new_lines.append(line)
                 
-        if is_updated:
-            os.makedirs(os.path.dirname(list_path), exist_ok=True)
-            with open(list_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
-    else:
-        print(f"警告: リストファイルが見つかりません ({list_path})")
-
+    if found or is_deleted:
+        os.makedirs(os.path.dirname(list_path), exist_ok=True)
+        with open(list_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+            
     return is_updated
-
+        
 # ==========================================
 
 
@@ -327,6 +336,22 @@ def main():
 
     print("--------------------------------")
     novel_title = novel_info.only_get_work_title()
+
+    # ★ コンテンツ削除のチェック
+    if novel_title is None or novel_title == "" or novel_title == "None":
+        print(f"\n################################################")
+        print(f"警告: カクヨムID {work_id} のタイトルが取得できません。")
+        print(f"コンテンツが削除されている可能性があります。フラグを停止に更新します。")
+        print(f"################################################")
+        
+        if MANAGEMENT_MODE == "sqlite":
+            manage_with_sqlite(DB_FILE_PATH, work_id, SITE_TYPE, None, None, is_deleted=True)
+        elif MANAGEMENT_MODE == "csv":
+            manage_with_csv(CSV_FILE_PATH, work_id, None, is_deleted=True)
+        
+        sys.exit(0) # 以降のスクレイピング・ファイル出力を中断
+
+    # 通常のノベルデータ更新処理
     novel_auther = novel_info.only_get_auther_activity_name()
     latest_date = novel_info.only_get_work_last_update()
     
@@ -385,9 +410,10 @@ def main():
             has_chapter = any(k.startswith("Chapter:") for k in rec01)
 
             if has_chapter:
-                get_chapter_title(f)
+                # 実際に main() に存在している変数（実引数）を渡す
+                get_chapter_title(f, rec01, work_id, kakuyomu_url)
             else:
-                get_episode_info(f)
+                get_episode_info(f, rec01, work_id, kakuyomu_url)
 
             print(html_footer, file=f)
 

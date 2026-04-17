@@ -37,13 +37,13 @@ args = parser.parse_args()
 # 引数から値を取得
 novel_id = args.novel_id
 
-MANAGEMENT_MODE = "sqlite"  # "csv" または "sqlite" を指定
+MANAGEMENT_MODE = args.mode 
 SITE_TYPE = "narou"         # DB用のサイト識別子
 
 # ファイルパスの定義
 LIST_DIR = "../../novel_database/"
 CSV_FILE_NAME = "narou_all_novel_id.list"
-DB_FILE_NAME = "sampl_database_01.db"
+DB_FILE_NAME = "all_novels_database_01.db"
 
 CSV_FILE_PATH = os.path.join(LIST_DIR, CSV_FILE_NAME)
 DB_FILE_PATH = os.path.join(LIST_DIR, DB_FILE_NAME)
@@ -99,19 +99,23 @@ html_filename = f'../../html/narou/{prefix}{novel_id}.html'
 ###################################################
 
 
-def get_novel_base_info():
-    novel_series = soup.find(class_="p-novel__series")
+def get_novel_base_info(soup_data):
+    novel_series = soup_data.find(class_="p-novel__series")
     # 修正: Pythonらしい条件分岐でスッキリと記述 (前回不足していた is を追加)
     novel_series_name = "N/A" if novel_series is None else novel_series.text.strip()
-    # print (novel_series_name)
-    novel_title = soup.find(class_="p-novel__title").text.strip()
-    # print (novel_title)
-    novel_auther = soup.find(class_="p-novel__author").text.strip()
+
+    # 修正: タイトルタグが存在しない場合(削除時)は "エラー" を返す
+    title_tag = soup_data.find(class_="p-novel__title")
+    novel_title = title_tag.text.strip() if title_tag else "エラー"
+
+    # 修正: 作者タグも同様に安全化
+    author_tag = soup_data.find(class_="p-novel__author")
+    novel_auther = author_tag.text.strip() if author_tag else "エラー"
+
     return [novel_series_name, novel_title, novel_auther]
 
-
-def get_page_counts():
-    novel_page_contents = soup.find("div", class_="c-pager")
+def get_page_counts(soup_data):
+    novel_page_contents = soup_data.find("div", class_="c-pager")
     if novel_page_contents is None:
         last_page_num = 1
     else:
@@ -125,14 +129,16 @@ def get_page_counts():
     # print (last_page_line)
     # print("num.--------------------------------")
     # print (last_page_url)
-    return int(last_page_num) # 修正: 数値として返すよう明示的にキャスト
 
+    # 修正: 数値として返すよう明示的にキャスト
+    return int(last_page_num)
 
-def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
+# 引数に target_novel_id, base_url, headers を追加
+def get_all_pages(page_num, novel_series_name, novel_title, novel_auther, target_novel_id, base_url, headers):
     ep_num = 1
     chp_num = 1
     page_num = int(page_num) + 1
-    contents_json = {"__typename": "Story", "id": novel_id, "series": novel_series_name, "title": novel_title, "AuthorName": novel_auther}
+    contents_json = {"__typename": "Story", "id": target_novel_id, "series": novel_series_name, "title": novel_title, "AuthorName": novel_auther}
 
     # Chapterの無いNovelのためにます、 ep_list とchapter_jsonを初期化しておく。
     chapter_json_name = "Chapters_1"
@@ -142,11 +148,12 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
     for get_page_num in range(1, page_num):
         # print ("Page:",get_page_num,"#-----")
         # 修正: f-stringの適用
-        _load_url = f"{novel_url}/{novel_id}/?p={get_page_num}"
-        l_html = requests.get(_load_url, headers=ua_headers)
+        _load_url = f"{base_url}/{target_novel_id}/?p={get_page_num}"
+        l_html = requests.get(_load_url, headers=headers)
         l_soup = BeautifulSoup(l_html.content, "html.parser")
-        novel_main_contents = l_soup.find("div", class_="p-eplist")
         # novel_ep_contents_list = (novel_main_contents.find("div" , class_= "p-eplist__subtitle"))
+        novel_main_contents = l_soup.find("div", class_="p-eplist")
+
         
         # 安全策: 万が一中身が取得できなかったらスキップ
         if not novel_main_contents:
@@ -178,7 +185,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
                 # print ("#2",key_link," / ",key_update_date)
                 # print ("------------")
                 # 修正: f-stringの適用
-                novel_sub_url = f'{novel_url}{key_link.get("href")}'
+                novel_sub_url = f'{base_url}{key_link.get("href")}'
                 novel_sub_title = key_link.text.strip()
                 novel_sub_update = key_update_date.text.strip().replace("\n", "")
                 ep_list.append({"__typename": "Episode", "ep_num": ep_num, "url": novel_sub_url,
@@ -193,7 +200,7 @@ def get_all_pages(page_num, novel_series_name, novel_title, novel_auther):
     return contents_json
 
 
-def create_html_file(list_dict, f_html):
+def create_html_file(list_dict, f_html, author_link_url):  # ← 第3引数を追加
 
     ###################################################
     # 出力用　HTML HEADER
@@ -220,7 +227,7 @@ def create_html_file(list_dict, f_html):
 
     # 修正: f-stringの適用
     print(f"<h2> {list_dict['title']} (id: {list_dict['id']}) </h2>", file=f_html)
-    print(f"<h2> by <a href=\"{load_url}\">{list_dict['AuthorName']}</a> </h2>", file=f_html)
+    print(f"<h2> by <a href=\"{author_link_url}\">{list_dict['AuthorName']}</a> </h2>", file=f_html)
 
     for chap_list_key in list_dict:
         if "Chapters_" in chap_list_key:
@@ -244,7 +251,7 @@ def create_html_file(list_dict, f_html):
 # データベース / CSV 管理用関数群
 # ==========================================
 
-def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
+def manage_with_sqlite(db_path, target_novel_id, site_type, title, latest_date, is_deleted=False):
     """
     SQLiteを用いて更新日時を管理し、更新の有無を返す関数
     """
@@ -266,69 +273,85 @@ def manage_with_sqlite(db_path, novel_id, site_type, title, latest_date):
         )
     ''')
 
-    # 現在登録されているデータを検索
-    cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (novel_id,))
-    row = cursor.fetchone()
-
-    if row:
-        db_last_update = row[0]
-        # 更新日が同じならスキップ判定
-        if latest_date and db_last_update == latest_date:
-            is_updated = False
-        else:
-            # 日付が変わっていればレコードを更新
-            cursor.execute('UPDATE novels SET title = ?, last_update = ? WHERE novel_id = ?', 
-                           (title, latest_date, novel_id))
+    if is_deleted:
+        print(f"!!! [SQLITE] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 (停止) に更新します。")
+        cursor.execute('UPDATE novels SET flag = 0 WHERE novel_id = ?', (target_novel_id,))
+        is_updated = False
     else:
-        # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
-        cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
-                       (novel_id, site_type, 1, title, latest_date))
+        # 現在登録されているデータを検索
+        cursor.execute('SELECT last_update, flag FROM novels WHERE novel_id = ?', (target_novel_id,))
+        row = cursor.fetchone()
+        if row:
+            db_last_update = row[0]
+            # 更新日が同じならスキップ判定
+            if latest_date and db_last_update == latest_date:
+                is_updated = False
+            else:
+                # 日付が変わっていればレコードを更新
+                cursor.execute('UPDATE novels SET title = ?, last_update = ?, flag = 1 WHERE novel_id = ?', 
+                               (title, latest_date, target_novel_id))
+        else:
+            # 新規登録（CSVに合わせたデフォルトフラグとして 1 を設定）
+            cursor.execute('INSERT INTO novels (novel_id, site_type, flag, title, last_update) VALUES (?, ?, ?, ?, ?)',
+                           (target_novel_id, site_type, 1, title, latest_date))
 
     # 変更を保存して接続を閉じる
     conn.commit()
     conn.close()
-
     return is_updated
 
 
-def manage_with_csv(list_path, novel_id, latest_date):
+def manage_with_csv(list_path, target_novel_id, latest_date, is_deleted=False):
     """
     CSV(.list)形式を用いて更新日時を管理し、更新の有無を返す関数
     （これまでの処理をそのまま関数化したものです）
     """
     is_updated = True
 
-    if os.path.exists(list_path):
-        with open(list_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+    if not os.path.exists(list_path):
+        print(f"警告: リストファイルが見つかりません ({list_path})")
+        return False
+
+    with open(list_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
             
-        new_lines = []
-        for line in lines:
-            if line.startswith(f"{novel_id},"):
-                parts = line.split(',', 2)
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.startswith(f"{target_novel_id},"):
+            found = True
+            parts = line.split(',', 2)
+
+            if is_deleted:
+                print(f"!!! [CSV] コンテンツ不在を検知。ID: {target_novel_id} の取得フラグを 0 に更新します。")
+                new_line = f"{parts[0]}, 0, {parts[2]}" if len(parts) >= 3 else line
+                new_lines.append(new_line)
+                is_updated = False
+
+            else:
                 if len(parts) == 3:
                     if latest_date and (latest_date in parts[2]):
                         is_updated = False
                         new_lines.append(line)
                     else:
                         sub_parts = parts[2].rsplit(',', 1)
-                        if len(sub_parts) == 2 and re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]):
+                        # カクヨムとなろうで正規表現が違うため、環境に合わせて柔軟にマッチさせます
+                        if len(sub_parts) == 2 and (re.search(r'\d{4}/\d{2}/\d{2}', sub_parts[1]) or re.search(r'\d{4}年\d{2}月\d{2}日', sub_parts[1])):
                             new_line = f"{parts[0]},{parts[1]},{sub_parts[0]}, {latest_date}\n"
+
                         else:
                             clean_title = parts[2].rstrip('\n')
                             new_line = f"{parts[0]},{parts[1]},{clean_title}, {latest_date}\n"
                         new_lines.append(new_line)
                 else:
                     new_lines.append(line)
-            else:
-                new_lines.append(line)
-                
-        if is_updated:
-            os.makedirs(os.path.dirname(list_path), exist_ok=True)
-            with open(list_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
-    else:
-        print(f"警告: リストファイルが見つかりません ({list_path})")
+        else:
+            new_lines.append(line)
+            
+    if found or is_deleted:
+        os.makedirs(os.path.dirname(list_path), exist_ok=True)
+        with open(list_path, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
 
     return is_updated
 
@@ -350,14 +373,28 @@ def main():
     print("--------------------------------")
     
     # 修正: 関数を一度だけ呼んで変数に格納（無駄な重複処理を回避）
-    page_num = get_page_counts()
+    page_num = get_page_counts(soup)
     print("All Page Count : ", page_num)
 
     # 修正: 同様に一度だけ呼び出す
-    base_info = get_novel_base_info()
+    base_info = get_novel_base_info(soup)
     novel_series_name = base_info[0]
     novel_title = base_info[1]
     novel_auther = base_info[2]
+
+    # ★ コンテンツ削除のチェック
+    if novel_title is None or novel_title == "" or "エラー" in novel_title:
+        print(f"\n################################################")
+        print(f"警告: なろうID {novel_id} のタイトルが取得できません。")
+        print(f"削除または非公開の可能性があります。フラグを停止に更新します。")
+        print(f"################################################")
+
+        if MANAGEMENT_MODE == "sqlite":
+            manage_with_sqlite(DB_FILE_PATH, novel_id, SITE_TYPE, None, None, is_deleted=True)
+        elif MANAGEMENT_MODE == "csv":
+            manage_with_csv(CSV_FILE_PATH, novel_id, None, is_deleted=True)
+        
+        sys.exit(0) # 以降のスクレイピング・ファイル出力を中断
     
     print("タイトル:", novel_title)
     print("シリーズ名:", novel_series_name)
@@ -369,7 +406,7 @@ def main():
     #########################
     
     # 最も重い処理(HTTPリクエスト群)を1回だけ実行して変数へ格納
-    list_dict = get_all_pages(page_num, novel_series_name, novel_title, novel_auther)
+    list_dict = get_all_pages(page_num, novel_series_name, novel_title, novel_auther, novel_id, novel_url, ua_headers)
 
     # ---------------------------------------------------------
     # 追加: 更新判定と narou_all_novel_id.list の更新処理
@@ -407,7 +444,7 @@ def main():
             print(json.dumps(list_dict, indent=4, ensure_ascii=False), file=f)
 
         with open(html_filename, 'w', encoding='utf-8') as f_html:
-            create_html_file(list_dict, f_html)
+            create_html_file(list_dict, f_html, load_url)
     else:
         print(f"【更新なし】コンテンツに変更はありませんでした (最終更新: {latest_date})。出力処理をスキップします。")
 
